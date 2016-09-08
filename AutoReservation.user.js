@@ -694,10 +694,10 @@ THE SOFTWARE.
                 '<div>' + '<h1 style="text-align:center;color:#00a2e6;margin-bottom:20px;margin-top:60px;">' +
                 '<span>キーワード自動予約</span></h1>' +
                 '<div class="table__scroll--fixed"><table class="table__description th_head01"><tr>' +
-                '<th width="35%">キーワード</th>' +
+                '<th width="30%">キーワード</th>' +
                 '<th width="15%">番組ジャンル</th>' +
                 '<th width="15%">チャンネル</th>' +
-                '<th width="25">除外ワード</th>' +
+                '<th width="30%">除外ワード</th>' +
                 '<th width="5%"></th>' +
                 '<th width="5%">予約</th>' +
                 '</tr></table></div><div id="akr_option" style="padding:6px;">' +
@@ -709,10 +709,10 @@ THE SOFTWARE.
                 '<input class="btn__default link--on-mouse" id="akr_start" value="自動予約">' +
                 '</p></div></div>';
             var keywordTemplate1 = '' +
-                '<td class="text-left"><input type="text" class="l-border-light-blue" style="width:100%"></td>' +
-                '<td class="text-left"><input type="text" class="l-border-light-blue" style="width:100%"></td>' +
-                '<td class="text-left"><input type="text" class="l-border-light-blue" style="width:100%"></td>' +
-                '<td class="text-left"><input type="text" class="l-border-light-blue" style="width:100%"></td>' +
+                '<td style="padding:17px"><input type="text" class="l-border-light-blue" style="width:100%"></td>' +
+                '<td style="padding:17px"><input type="text" class="l-border-light-blue" style="width:100%"></td>' +
+                '<td style="padding:17px"><input type="text" class="l-border-light-blue" style="width:100%"></td>' +
+                '<td style="padding:17px"><input type="text" class="l-border-light-blue" style="width:100%"></td>' +
                 '<td style="padding:5px"><button>保存</button></td>';
             var keywordTemplate2 = '' +
                 '<td class="text-left"></td>' +
@@ -915,7 +915,7 @@ THE SOFTWARE.
     // Main Transitions
     debug("entering " + document.URL)
 
-    if (document.URL == urlstart) {
+    if (document.URL.indexOf(urlstart) == 0) {
         if (isExpectingPage(urlrestart)) {
             LS_putValue("nextFire", Date.now() + interval);
         }
