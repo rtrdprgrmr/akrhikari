@@ -26,13 +26,13 @@ THE SOFTWARE.
 // @namespace   rtrdprgrmr@yahoo.co.jp
 // @copyright	2014-2016, rtrdprgrmr
 // @license	MIT License
-// @homepageURL	http://akrhikari.blogspot.jp/2014/08/tv.html
-// @supportURL	mailto:rtrdprgrmr@yahoo.co.jp
+// @homepageURL	https://github.com/rtrdprgrmr/akrhikari
+// @supportURL	https://github.com/rtrdprgrmr/akrhikari/issues
 // @include     https://www.hikaritv.net/*
 // @grant	GM_getValue
 // @grant	GM_setValue
 // @grant	GM_deleteValue
-// @version     2.00
+// @version     2.01
 // ==/UserScript==
 //
 (function() {
