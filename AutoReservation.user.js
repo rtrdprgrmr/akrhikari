@@ -694,16 +694,18 @@ THE SOFTWARE.
                 '<div>' + '<h1 style="text-align:center;color:#00a2e6;margin-bottom:20px;margin-top:60px;">' +
                 '<span>キーワード自動予約</span></h1>' +
                 '<div class="table__scroll--fixed"><table class="table__description th_head01"><tr>' +
-                '<th>キーワード</th>' +
-                '<th>番組ジャンル</th>' +
-                '<th>チャンネル</th>' +
-                '<th>除外ワード</th>' +
-                '<th></th>' +
+                '<th width="35%">キーワード</th>' +
+                '<th width="15%">番組ジャンル</th>' +
+                '<th width="15%">チャンネル</th>' +
+                '<th width="25">除外ワード</th>' +
+                '<th width="5%"></th>' +
+                '<th width="5%">予約</th>' +
                 '</tr></table></div><div id="akr_option" style="padding:6px;">' +
                 '予約範囲：<select id="akr_days"><option>1</option><option>2</option><option>3</option>' +
                 '<option>4</option><option>5</option><option>6</option><option>7</option></select>日後まで　　' +
-                '<input type="checkbox" id="akr_rep"><label id="akr_rep_text" for="akr_rep">' +
-                '予約を自動リピートする</label>' + '<p class="text-center btn_chg">' +
+                '<input type="checkbox" id="akr_rep" style="margin:20px 5px 20px 5px">' +
+                '<label id="akr_rep_text" for="akr_rep">予約を自動リピートする</label>' +
+                '<p class="text-center btn_chg">' +
                 '<input class="btn__default link--on-mouse" id="akr_start" value="自動予約">' +
                 '</p></div></div>';
             var keywordTemplate1 = '' +
@@ -711,13 +713,14 @@ THE SOFTWARE.
                 '<td class="text-left"><input type="text" class="l-border-light-blue" style="width:100%"></td>' +
                 '<td class="text-left"><input type="text" class="l-border-light-blue" style="width:100%"></td>' +
                 '<td class="text-left"><input type="text" class="l-border-light-blue" style="width:100%"></td>' +
-                '<td class="text-left"><button>保存</button></td>';
+                '<td style="padding:5px"><button>保存</button></td>';
             var keywordTemplate2 = '' +
-                '<td style="text-left"></td>' +
-                '<td style="text-left"></td>' +
-                '<td style="text-left"></td>' +
-                '<td style="text-left"></td>' +
-                '<td style="text-left"><button>編集</button><button>予約</button></td>';
+                '<td class="text-left"></td>' +
+                '<td class="text-left"></td>' +
+                '<td class="text-left"></td>' +
+                '<td class="text-left"></td>' +
+                '<td style="padding:5px"><button>編集</button></td>' +
+                '<td style="padding:5px"><button>予約</button></td>';
 
             var editAction = function(e) {
                 var oldTr = e.target.parentNode.parentNode;
