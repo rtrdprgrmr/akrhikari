@@ -33,7 +33,7 @@ THE SOFTWARE.
 // @grant	GM_getValue
 // @grant	GM_setValue
 // @grant	GM_deleteValue
-// @version     2.02
+// @version     2.03
 // ==/UserScript==
 //
 (function() {
@@ -930,6 +930,18 @@ THE SOFTWARE.
     if (document.URL.indexOf(urlsearch) == 0 && isExpectingPage(urlsearch)) {
         setTimeout(function() {
             var div = document.getElementById("js-tab-menu-area");
+            if (!div) {
+                var div = document.getElementsByClassName("error-report")[0];
+                if (div && div.textContent.indexOf("時間をおいてから再度お試しください") >= 0) {
+                    setTimeout(function() {
+                        gotoPage(urlsearch);
+                        location.reload();
+                    }, displayTimeout);
+                    return;
+                }
+                nextKeyword();
+                return;
+            }
             var ul = div.getElementsByTagName("ul")[1];
             var li = ul.getElementsByTagName("li")[1];
             var a = li.getElementsByTagName("a")[0];
