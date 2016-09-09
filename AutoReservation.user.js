@@ -35,7 +35,7 @@ THE SOFTWARE.
 // @grant	GM_getValue
 // @grant	GM_setValue
 // @grant	GM_deleteValue
-// @version     2.07
+// @version     2.071
 // ==/UserScript==
 //
 (function() {
