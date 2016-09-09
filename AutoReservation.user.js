@@ -1,3 +1,4 @@
+﻿
 /*
 Copyright(C) 2014-2016 rtrdprgrmr
 
@@ -34,7 +35,7 @@ THE SOFTWARE.
 // @grant	GM_getValue
 // @grant	GM_setValue
 // @grant	GM_deleteValue
-// @version     2.05
+// @version     2.06
 // ==/UserScript==
 //
 (function() {
@@ -321,9 +322,25 @@ THE SOFTWARE.
         nextKeyword(true);
     }
 
-    function checkTitlePre(title) {
+    function checkTitlePre1(title, channo) {
         var keywordIndex = parseInt(LS_getValue("indexOfKeywords"));
+        var channelREX = new RegExp(channel_source = stripconv(LS_getValue("channel" + keywordIndex)), "i");
         var exceptREX = new RegExp(stripconv(LS_getValue("except" + keywordIndex)), "i");
+        var code = encode(title);
+        if (exceptREX.test(title) && exceptREX.exec(title)[0].length > 0) {
+            console.log("except:" + title)
+            return false;
+        }
+        if (channo && channel_source.search(/[^0-9+*?{,}\[\]-]/) < 0) {
+            if (!channelREX.test(channo)) {
+                console.log("not channo:" + title)
+                return false;
+            }
+        }
+        return true;
+    }
+
+    function checkTitlePre2(title) {
         var code = encode(title);
         if (R_DB.get(code) !== 0) {
             console.log("reserved:" + title);
@@ -331,10 +348,6 @@ THE SOFTWARE.
         }
         if (T_DB.get(code) !== 0) {
             console.log("reserving:" + title);
-            return false;
-        }
-        if (exceptREX.test(title) && exceptREX.exec(title)[0].length > 0) {
-            console.log("except:" + title)
             return false;
         }
         return true;
@@ -402,6 +415,7 @@ THE SOFTWARE.
     }
 
     var expandSearchResultCount = 0;
+    var chimgREX = new RegExp("https://www.hikaritv.net/resources/hikari/pc/images/ch_logo/ch[0-9]+/([0-9]{3,3}).png");
 
     function parseSearchResult() {
         try {
@@ -418,8 +432,7 @@ THE SOFTWARE.
             var wall = div_tab_tv.getElementsByClassName("search-result-wall")[0];
             var inp = wall.getElementsByTagName("input")[0];
             if (inp.value == "さらに表示する" &&
-                Array.prototype.indexOf.call(inp.classList, "js-hide") < 0 &&
-                ++expandSearchResultCount <= 10) {
+                Array.prototype.indexOf.call(inp.classList, "js-hide") < 0 && ++expandSearchResultCount <= 10) {
                 debug("expand search result")
                 setTimeout(function() {
                     inp.click();
@@ -432,8 +445,17 @@ THE SOFTWARE.
             var titles = [];
             for (var i = 0; i < list.length; i++) {
                 var title = stripconv(list[i].textContent);
-                var crid = list[i].getAttribute("data-href").split('&')[1]
+                var crid = list[i].getAttribute("data-href").split('&')[1];
                 if (!crid || !title) continue;
+                var img = list[i].getElementsByTagName("img")[0];
+                var src = img.getAttribute("src");
+                var m = src.match(chimgREX);
+                if (m && m[1]) {
+                    var channo = m[1];
+                }
+                if (!checkTitlePre1(title, channo)) {
+                    continue;
+                }
                 titles.push(title);
                 titles.push(crid);
             }
@@ -451,7 +473,7 @@ THE SOFTWARE.
                 nextKeyword();
                 return;
             }
-            if (!checkTitlePre(title)) {
+            if (!checkTitlePre2(title)) {
                 continue;
             }
             setTimeout(function() {
