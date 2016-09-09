@@ -1,4 +1,3 @@
-﻿
 /*
 Copyright(C) 2014-2016 rtrdprgrmr
 
@@ -28,6 +27,7 @@ THE SOFTWARE.
 // @copyright	2014-2016, rtrdprgrmr
 // @license	MIT License
 // @downloadURL	https://rtrdprgrmr.github.io/akrhikari/AutoReservation.user.js
+// @updateURL	https://rtrdprgrmr.github.io/akrhikari/AutoReservation.meta.js
 // @homepageURL	https://github.com/rtrdprgrmr/akrhikari
 // @supportURL	https://github.com/rtrdprgrmr/akrhikari/issues
 // @include     https://www.hikaritv.net/*
@@ -35,7 +35,7 @@ THE SOFTWARE.
 // @grant	GM_getValue
 // @grant	GM_setValue
 // @grant	GM_deleteValue
-// @version     2.06
+// @version     2.07
 // ==/UserScript==
 //
 (function() {
