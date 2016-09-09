@@ -34,7 +34,7 @@ THE SOFTWARE.
 // @grant	GM_getValue
 // @grant	GM_setValue
 // @grant	GM_deleteValue
-// @version     2.04
+// @version     2.05
 // ==/UserScript==
 //
 (function() {
@@ -578,7 +578,7 @@ THE SOFTWARE.
             var keywordIndex = parseInt(LS_getValue("indexOfKeywords"));
             if (!(keywordIndex >= 0)) {
                 done1();
-                return
+                return;
             }
             var keywordIndex1 = parseInt(LS_getValue("keywordIndex1"));
             if (keywordIndex1 >= 0) {
@@ -955,7 +955,7 @@ THE SOFTWARE.
             location.href = a.getAttribute("data-href");
             setTimeout(parseSearchResult, displayTimeout);
         }, displayTimeout);
-        return
+        return;
     }
 
     if (document.URL.indexOf(urllogin) == 0 && isExpectingPage(urllogin)) {
@@ -977,16 +977,19 @@ THE SOFTWARE.
                 submit.click();
             }, clickTimeout);
         }, displayTimeout);
-        return
+        return;
     }
 
     if (document.URL.indexOf(urllogincomp) == 0 && isExpectingPage(urllogincomp)) {
+        debug("urllogincomp1");
         gotoPage(urllogincomp);
+        return;
     }
 
     if (isExpectingPage(urllogincomp)) {
-        debug("urllogincomp");
+        debug("urllogincomp2");
         nextKeyword(true);
+        return;
     }
 
     if (document.URL == urllist + "?disp=now" && isExpectingPage(urldelcomp)) {
