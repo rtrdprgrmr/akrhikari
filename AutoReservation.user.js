@@ -35,7 +35,7 @@ THE SOFTWARE.
 // @grant	GM_getValue
 // @grant	GM_setValue
 // @grant	GM_deleteValue
-// @version     2.071
+// @version     2.08
 // ==/UserScript==
 //
 (function() {
@@ -404,7 +404,7 @@ THE SOFTWARE.
     function checkDate(start) {
         var days = parseInt(LS_getValue("akr_days")) + 1;
         if (!(1 <= days && days <= 7)) {
-            days = 1;
+            days = 5;
         }
         var lookahead = days * oneday;
         var now = Date.now();
@@ -734,7 +734,7 @@ THE SOFTWARE.
                 '<th width="15%">チャンネル</th>' +
                 '<th width="30%">除外ワード</th>' +
                 '<th width="5%"></th>' +
-                '<th width="5%">予約</th>' +
+                '<th width="5%"></th>' +
                 '</tr></table></div><div id="akr_option" style="padding:6px;">' +
                 '予約範囲：<select id="akr_days"><option>1</option><option>2</option><option>3</option>' +
                 '<option>4</option><option>5</option><option>6</option><option>7</option></select>日後まで　　' +
@@ -922,7 +922,7 @@ THE SOFTWARE.
             table.appendChild(tr);
             var akr_option = document.getElementById("akr_option");
             var options = akr_option.getElementsByTagName("input");
-            options[0].checked = (LS_getValue("automatic") != "false");
+            options[0].checked = !!LS_getValue("automatic");
             options[0].addEventListener('click', clickAction, false);
             var akr_days = document.getElementById("akr_days");
             akr_days.selectedIndex = parseInt(LS_getValue("akr_days"));
