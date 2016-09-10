@@ -402,11 +402,8 @@ THE SOFTWARE.
     }
 
     function checkDate(start) {
-        var days = parseInt(LS_getValue("akr_days")) + 1;
-        if (!(1 <= days && days <= 7)) {
-            days = 5;
-        }
-        var lookahead = days * oneday;
+        var days_index = parseInt(LS_getValue("akr_days"));
+        var lookahead = (days_index + 1) * oneday;
         var now = Date.now();
         if (now + lookahead < start) {
             return false;
@@ -925,7 +922,12 @@ THE SOFTWARE.
             options[0].checked = !!LS_getValue("automatic");
             options[0].addEventListener('click', clickAction, false);
             var akr_days = document.getElementById("akr_days");
-            akr_days.selectedIndex = parseInt(LS_getValue("akr_days"));
+            var days_index = parseInt(LS_getValue("akr_days"));
+            if (!(0 <= days_index && days_index <= 6)) {
+                days_index = 4;
+                LS_putValue("akr_days", days_index);
+            }
+            akr_days.selectedIndex = days_index;
             akr_days.addEventListener('change', function() {
                 LS_putValue("akr_days", akr_days.selectedIndex);
             }, false);
