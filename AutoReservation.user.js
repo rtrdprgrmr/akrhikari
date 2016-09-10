@@ -35,7 +35,7 @@ THE SOFTWARE.
 // @grant	GM_getValue
 // @grant	GM_setValue
 // @grant	GM_deleteValue
-// @version     2.08
+// @version     2.10
 // ==/UserScript==
 //
 (function() {
@@ -919,7 +919,7 @@ THE SOFTWARE.
             table.appendChild(tr);
             var akr_option = document.getElementById("akr_option");
             var options = akr_option.getElementsByTagName("input");
-            options[0].checked = !!LS_getValue("automatic");
+            options[0].checked = (LS_getValue("automatic") == "true");
             options[0].addEventListener('click', clickAction, false);
             var akr_days = document.getElementById("akr_days");
             var days_index = parseInt(LS_getValue("akr_days"));
