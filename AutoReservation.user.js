@@ -1,4 +1,4 @@
-/*
+﻿/*
 Copyright(C) 2014-2016 rtrdprgrmr
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -35,7 +35,7 @@ THE SOFTWARE.
 // @grant	GM_getValue
 // @grant	GM_setValue
 // @grant	GM_deleteValue
-// @version     2.10
+// @version     2.11
 // ==/UserScript==
 //
 (function() {
@@ -500,8 +500,22 @@ THE SOFTWARE.
             }
             var record_area = section.getElementsByClassName("record_area")[0];
             var record_area_a = record_area.getElementsByTagName("a")[0];
+            var h3 = ctts.getElementsByClassName("mdConts_tabInner_title")[0];
+            var table = section.getElementsByTagName("table")[0];
+            var tds = section.getElementsByTagName("td");
+            var title1 = stripconv(h3.textContent);
+            var range = parseTimeRange2(tds[0].textContent);
+            var genre = stripconv(tds[1].textContent);
+            var channel = stripconv(tds[2].textContent);
             if (!record_area_a) {
                 console.log("not recordable:" + title);
+                parseSearchDetail(titles);
+                return;
+            }
+            if (strip(record_area.textContent) == "録画予約済み") {
+                console.log("already reserved:" + title);
+                var code = encode(title);
+                R_DB.put(code, range[0]);
                 parseSearchDetail(titles);
                 return;
             }
@@ -515,13 +529,6 @@ THE SOFTWARE.
                 parseSearchDetail(titles);
                 return;
             }
-            var h3 = ctts.getElementsByClassName("mdConts_tabInner_title")[0];
-            var table = section.getElementsByTagName("table")[0];
-            var tds = section.getElementsByTagName("td");
-            var title1 = stripconv(h3.textContent);
-            var range = parseTimeRange2(tds[0].textContent);
-            var genre = stripconv(tds[1].textContent);
-            var channel = stripconv(tds[2].textContent);
             if (title != title1) {
                 debug("UNEXPECTED: " + title1 + " EXPECTED: " + title);
                 parseSearchDetail(titles);
