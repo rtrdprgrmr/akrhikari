@@ -35,7 +35,7 @@ THE SOFTWARE.
 // @grant	GM_getValue
 // @grant	GM_setValue
 // @grant	GM_deleteValue
-// @version     2.11
+// @version     2.12
 // ==/UserScript==
 //
 (function() {
@@ -413,6 +413,7 @@ THE SOFTWARE.
 
     var expandSearchResultCount = 0;
     var chimgREX = new RegExp("https://www.hikaritv.net/resources/hikari/pc/images/ch_logo/ch[0-9]+/([0-9]{3,3}).png");
+	var errorCount = 0;
 
     function parseSearchResult() {
         try {
@@ -423,6 +424,10 @@ THE SOFTWARE.
                     nextKeyword();
                     return;
                 }
+				if(errorCount++ > 100){
+                    nextKeyword();
+                    return;
+				}
                 setTimeout(parseSearchResult, pollingTimeout);
                 return;
             }
