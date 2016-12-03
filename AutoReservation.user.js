@@ -1,4 +1,5 @@
-﻿/*
+﻿
+/*
 Copyright(C) 2014-2016 rtrdprgrmr
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -35,7 +36,7 @@ THE SOFTWARE.
 // @grant	GM_getValue
 // @grant	GM_setValue
 // @grant	GM_deleteValue
-// @version     2.12
+// @version     2.14
 // ==/UserScript==
 //
 (function() {
@@ -48,13 +49,9 @@ THE SOFTWARE.
     var displayTimeout = 2000;
     var clickTimeout = 1000;
     var pollingTimeout = 300;
-    var countDownThreshold = 30; // sec
+    var countDownThreshold = 60; // sec
 
     // Utility functions
-    function debug(msg) {
-        console.log(msg);
-    }
-
     function LS_getValue(key) {
         return GM_getValue(key, "").toString();
     }
@@ -155,6 +152,14 @@ THE SOFTWARE.
         var expecting = LS_getValue("expecting");
         if (expecting == url) {
             LS_deleteValue("expecting");
+            setTimeout(function() {
+                if (url === urlrestart) return
+                console.log("RELOADING... " + url);
+                LS_putValue("expecting", url);
+                var script = document.createElement('script');
+                script.appendChild(document.createTextNode('location.reload();'));
+                document.body.appendChild(script);
+            }, 300000);
             return true;
         }
         return false;
@@ -267,6 +272,7 @@ THE SOFTWARE.
     var urlstart = "https://www.hikaritv.net/member/remote/reserve/regist";
     var urllist = "https://www.hikaritv.net/member/remote/reserve/list";
     var urlsearch = "https://www.hikaritv.net/#/search";
+    var urldetail = "https://www.hikaritv.net/#/tv/detail";
     var urldelcomp = "https://www.hikaritv.net/member/remote/reserve/delete_complete";
     var urlcancomp = "https://www.hikaritv.net/member/remote/reserve/cancel_complete"; // pseudo URL
     var urlrestart = "https://www.hikaritv.net/member/remote/reserve/restart"; // pseudo URL
@@ -308,7 +314,7 @@ THE SOFTWARE.
             console.log("EXCEPTION:parseReservationList:" + e);
         }
         try {
-            debug("nextList");
+            console.log("nextList");
             var p = document.getElementsByClassName("next")[0];
             var href = p.getElementsByTagName("a")[0].href;
             setTimeout(function() {
@@ -317,7 +323,7 @@ THE SOFTWARE.
             }, clickTimeout);
             return;
         } catch (e) {
-            debug("no next list");
+            console.log("no next list");
         }
         nextKeyword(true);
     }
@@ -413,7 +419,7 @@ THE SOFTWARE.
 
     var expandSearchResultCount = 0;
     var chimgREX = new RegExp("https://www.hikaritv.net/resources/hikari/pc/images/ch_logo/ch[0-9]+/([0-9]{3,3}).png");
-	var errorCount = 0;
+    var errorCount = 0;
 
     function parseSearchResult() {
         try {
@@ -424,10 +430,10 @@ THE SOFTWARE.
                     nextKeyword();
                     return;
                 }
-				if(errorCount++ > 100){
+                if (errorCount++ > 100) {
                     nextKeyword();
                     return;
-				}
+                }
                 setTimeout(parseSearchResult, pollingTimeout);
                 return;
             }
@@ -435,7 +441,7 @@ THE SOFTWARE.
             var inp = wall.getElementsByTagName("input")[0];
             if (inp.value == "さらに表示する" &&
                 Array.prototype.indexOf.call(inp.classList, "js-hide") < 0 && ++expandSearchResultCount <= 10) {
-                debug("expand search result")
+                console.log("expand search result")
                 setTimeout(function() {
                     inp.click();
                     setTimeout(parseSearchResult, displayTimeout);
@@ -479,6 +485,7 @@ THE SOFTWARE.
                 continue;
             }
             setTimeout(function() {
+                gotoPage(urldetail);
                 location.href = "#/tv/detail/" + crid;
                 setTimeout(parser, displayTimeout);
             }, clickTimeout);
@@ -496,7 +503,7 @@ THE SOFTWARE.
                 var div = ctts.getElementsByClassName("error-report")[0];
                 if (div) {
                     console.log("not found:" + title);
-                    debug(div.textContent)
+                    console.log(div.textContent)
                     parseSearchDetail(titles);
                     return;
                 }
@@ -535,7 +542,7 @@ THE SOFTWARE.
                 return;
             }
             if (title != title1) {
-                debug("UNEXPECTED: " + title1 + " EXPECTED: " + title);
+                console.log("UNEXPECTED: " + title1 + " EXPECTED: " + title);
                 parseSearchDetail(titles);
                 return;
             }
@@ -568,7 +575,7 @@ THE SOFTWARE.
             var btn = document.getElementsByClassName("btn-remote-reserve-rec")[0];
             var btn_a = btn.getElementsByTagName("a")[0];
             setTimeout(function() {
-                debug("confirming");
+                console.log("confirming");
                 gotoPage(urllogin);
                 btn_a.click();
                 setTimeout(wait_complete_reservation, displayTimeout);
@@ -582,7 +589,7 @@ THE SOFTWARE.
                 return;
             }
             reservingTitle(title);
-            debug("reservation completed " + title);
+            console.log("reservation completed " + title);
             parseSearchDetail(titles);
         }
 
@@ -666,7 +673,7 @@ THE SOFTWARE.
                 }
             }
         } catch (e) {}
-        debug("no items to delete");
+        console.log("no items to delete");
         searchKeyword();
     }
 
@@ -695,7 +702,7 @@ THE SOFTWARE.
             }
         } catch (e) {}
         try {
-            debug("next cancel list");
+            console.log("next cancel list");
             var p = document.getElementsByClassName("next")[0];
             var href = p.getElementsByTagName("a")[0].href;
             setTimeout(function() {
@@ -704,14 +711,14 @@ THE SOFTWARE.
             }, clickTimeout);
             return;
         } catch (e) {}
-        debug("no items to cancel");
+        console.log("no items to cancel");
         location.href = urllist + "?disp=before";
         return true;
     }
 
     function startAutoReserve() {
         try {
-            debug("start auto reserve");
+            console.log("start auto reserve");
             LS_deleteValue("nextFire");
             T_DB.clearAll();
             D_DB.clearAll();
@@ -726,8 +733,8 @@ THE SOFTWARE.
             gotoPage(urllist);
             location.href = urllist + "?disp=before";
         } catch (e) {
-            debug("EXCEPTION:" + e)
-            debug("STACK:" + e.stack)
+            console.log("EXCEPTION:" + e)
+            console.log("STACK:" + e.stack)
         }
     }
 
@@ -787,7 +794,7 @@ THE SOFTWARE.
                 var list = table.getElementsByTagName("tr");
                 for (var i = 0; i < list.length; i++) {
                     if (list[i] === tr) {
-                        debug("start clicked " + i);
+                        console.log("start clicked " + i);
                         e.target.disabled = true;
                         LS_putValue("keywordIndex1", i - 1);
                         startAutoReserve();
@@ -888,7 +895,7 @@ THE SOFTWARE.
                 setTimeout(countDown, 1000);
             }
             var startAction = function() {
-                debug("start clicked");
+                console.log("start clicked");
                 akr_start.disabled = true;
                 LS_putValue("keywordIndex1", -1);
                 startAutoReserve();
@@ -962,7 +969,7 @@ THE SOFTWARE.
     }
 
     // Main Transitions
-    debug("entering " + document.URL)
+    console.log("entering " + document.URL)
 
     if (document.URL.indexOf(urlstart) == 0) {
         if (isExpectingPage(urlrestart)) {
@@ -994,16 +1001,21 @@ THE SOFTWARE.
         return;
     }
 
+    if (document.URL.indexOf(urldetail) == 0 && isExpectingPage(urldetail)) {
+        nextKeyword(true);
+        return
+    }
+
     if (document.URL.indexOf(urllogin) == 0 && isExpectingPage(urllogin)) {
-        debug("urllogin");
+        console.log("urllogin");
         setTimeout(function() {
             var aikotoba = document.getElementById("aikotoba");
             if (!aikotoba) {
-                debug("no password input box");
+                console.log("no password input box");
                 return;
             }
             if (!aikotoba.value) {
-                debug("no password");
+                console.log("no password");
                 return;
             }
             var form = document.getElementById("login_form1");
@@ -1017,19 +1029,17 @@ THE SOFTWARE.
     }
 
     if (document.URL.indexOf(urllogincomp) == 0 && isExpectingPage(urllogincomp)) {
-        debug("urllogincomp1");
         gotoPage(urllogincomp);
         return;
     }
 
     if (isExpectingPage(urllogincomp)) {
-        debug("urllogincomp2");
         nextKeyword(true);
         return;
     }
 
     if (document.URL == urllist + "?disp=now" && isExpectingPage(urldelcomp)) {
-        debug("deleting expired reservation...");
+        console.log("deleting expired reservation...");
         handleDeleteReservation();
         return;
     }
@@ -1053,12 +1063,14 @@ THE SOFTWARE.
         var button = div.getElementsByTagName("button")[0];
         button.addEventListener('click', function() {
             if (window.confirm('キャンセル可能な予約をすべてキャンセルしますか？')) {
-                debug("canceling reservation...");
+                console.log("canceling reservation...");
                 handleCancelReservation();
             }
         }, false);
         contents_member.appendChild(div);
         return;
     }
+
+    console.log("no handlers found ...");
 
 })();
