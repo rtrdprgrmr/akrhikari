@@ -36,9 +36,10 @@ THE SOFTWARE.
 // @grant	GM_getValue
 // @grant	GM_setValue
 // @grant	GM_deleteValue
-// @version     2.14
+// @version     2.15
 // ==/UserScript==
 //
+
 (function() {
     var onehour = 60 * 60 * 1000;
     var oneday = 24 * onehour;
@@ -485,7 +486,7 @@ THE SOFTWARE.
                 continue;
             }
             setTimeout(function() {
-                gotoPage(urldetail);
+                gotoPage(urlsearch);
                 location.href = "#/tv/detail/" + crid;
                 setTimeout(parser, displayTimeout);
             }, clickTimeout);
@@ -1001,7 +1002,7 @@ THE SOFTWARE.
         return;
     }
 
-    if (document.URL.indexOf(urldetail) == 0 && isExpectingPage(urldetail)) {
+    if (document.URL.indexOf(urldetail) == 0 && isExpectingPage(urlsearch)) {
         nextKeyword(true);
         return
     }
