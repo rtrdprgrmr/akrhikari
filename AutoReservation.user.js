@@ -36,7 +36,7 @@ THE SOFTWARE.
 // @grant	GM_getValue
 // @grant	GM_setValue
 // @grant	GM_deleteValue
-// @version     2.20
+// @version     2.21
 // ==/UserScript==
 //
 
@@ -200,7 +200,8 @@ var trace_on = false;
             '<td style="padding:17px"><input type="text" class="l-border-light-blue" style="width:100%"></td>' +
             '<td style="padding:17px"><input type="text" class="l-border-light-blue" style="width:100%"></td>' +
             '<td style="padding:17px"><input type="text" class="l-border-light-blue" style="width:100%"></td>' +
-            '<td style="padding:5px"><button>保存</button></td>';
+            '<td style="padding:5px"><button>保存</button></td>' +
+            '<td style="padding:5px"><button>削除</button></td>';
         var keywordTemplate2 = '' +
             '<td class="text-left"></td>' +
             '<td class="text-left"></td>' +
@@ -208,6 +209,12 @@ var trace_on = false;
             '<td class="text-left"></td>' +
             '<td style="padding:5px"><button>編集</button></td>' +
             '<td style="padding:5px"><button>予約</button></td>';
+        var keywordTemplate3 = '' +
+            '<td style="padding:17px"><input type="text" class="l-border-light-blue" style="width:100%"></td>' +
+            '<td style="padding:17px"><input type="text" class="l-border-light-blue" style="width:100%"></td>' +
+            '<td style="padding:17px"><input type="text" class="l-border-light-blue" style="width:100%"></td>' +
+            '<td style="padding:17px"><input type="text" class="l-border-light-blue" style="width:100%"></td>' +
+            '<td style="padding:5px"><button>追加</button></td>';
 
         var editAction = function(e) {
             var oldTr = e.target.parentNode.parentNode;
@@ -221,6 +228,8 @@ var trace_on = false;
             inputs[3]._originalValue = inputs[3].value = tds[3].textContent;
             var button = newTr.getElementsByTagName("button")[0];
             button.addEventListener('click', saveAction, false);
+            var button = newTr.getElementsByTagName("button")[1];
+            button.addEventListener('click', deleteAction, false);
             table.replaceChild(newTr, oldTr);
             return true;
         }
@@ -238,6 +247,14 @@ var trace_on = false;
                 }
             }
             return true;
+        }
+
+        var deleteAction = function(e) {
+            var oldTr = e.target.parentNode.parentNode;
+            var inputs = oldTr.getElementsByTagName("input");
+            inputs[0].value = "";
+            e.target.textContent = "保存";
+            saveAction(e);
         }
 
         var saveAction = function(e) {
@@ -362,14 +379,13 @@ var trace_on = false;
             table.appendChild(tr);
         }
         var tr = document.createElement("tr");
-        tr.innerHTML = keywordTemplate1;
+        tr.innerHTML = keywordTemplate3;
         var inputs = tr.getElementsByTagName("input");
         inputs[0]._originalValue = "";
         inputs[1]._originalValue = "";
         inputs[2]._originalValue = "";
         inputs[3]._originalValue = "";
         var button = tr.getElementsByTagName("button")[0];
-        button.textContent = "追加";
         button.addEventListener('click', saveAction, false);
         table.appendChild(tr);
         var akr_option = document.getElementById("akr_option");
