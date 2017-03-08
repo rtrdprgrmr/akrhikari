@@ -1,6 +1,6 @@
 ﻿
 /*
-Copyright(C) 2014-2016 rtrdprgrmr
+Copyright(C) 2014-2017 rtrdprgrmr
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -25,7 +25,7 @@ THE SOFTWARE.
 // @name        Automated Keyword Reservation for www.hikaritv.net
 // @description	This script automatically make reservations of TV programs which match the keyword you specified.
 // @namespace   rtrdprgrmr@yahoo.co.jp
-// @copyright	2014-2016, rtrdprgrmr
+// @copyright	2014-2017, rtrdprgrmr
 // @license	MIT License
 // @downloadURL	https://rtrdprgrmr.github.io/akrhikari/AutoReservation.user.js
 // @updateURL	https://rtrdprgrmr.github.io/akrhikari/AutoReservation.meta.js
@@ -36,23 +36,53 @@ THE SOFTWARE.
 // @grant	GM_getValue
 // @grant	GM_setValue
 // @grant	GM_deleteValue
-// @version     2.15
+// @version     2.20
 // ==/UserScript==
 //
 
+var debug_on = false;
+var trace_on = false;
+
 (function() {
+
+    function debug() {
+        if (!debug_on) return;
+        var args = Array.prototype.slice.call(arguments);
+        console.log.apply(console, ["debug:"].concat(args));
+    }
+
+    function trace() {
+        if (!trace_on) return;
+        var args = Array.prototype.slice.call(arguments);
+        console.log.apply(console, ["trace:"].concat(args));
+    }
+
     var onehour = 60 * 60 * 1000;
     var oneday = 24 * onehour;
 
-    // Global Parameters
+    // ---------------------------- Parameters ----------------------------
+
     var history = 60 * oneday;
-    var interval = 1 * onehour;
+    var auto_reserve_interval = 1 * onehour;
     var displayTimeout = 2000;
     var clickTimeout = 1000;
     var pollingTimeout = 300;
     var countDownThreshold = 60; // sec
 
-    // Utility functions
+    var url_entry = "https://www.hikaritv.net/member/remote/reserve/regist";
+    var url_reservation_list = "https://www.hikaritv.net/member/remote/reserve/list?disp=before";
+    var url_expired_list = "https://www.hikaritv.net/member/remote/reserve/list?disp=now";
+    var url_delete_complete = "https://www.hikaritv.net/member/remote/reserve/delete_complete";
+    var url_search_all = "https://www.hikaritv.net/search/all/";
+    var url_search_tv = "https://www.hikaritv.net/search/tv/";
+    var url_detail = "https://www.hikaritv.net/tv/detail/";
+    var url_recording_confirm = "https://www.hikaritv.net/tv/reserve/recording/confirm/";
+    var url_recording_complete = "https://www.hikaritv.net/tv/reserve/recording/complete";
+    var url_login = "https://accounts.hikaritv.net/member/login";
+    var url_login_complete = "https://accounts.hikaritv.net/member/login_do";
+
+    // ---------------------------- Database ----------------------------
+
     function LS_getValue(key) {
         return GM_getValue(key, "").toString();
     }
@@ -65,7 +95,6 @@ THE SOFTWARE.
         GM_deleteValue(key);
     }
 
-    // Hash DB functions
     var T_DB = new load_HDB("T");
     var D_DB = new load_HDB("D");
     var R_DB = new load_HDB("R");
@@ -145,26 +174,234 @@ THE SOFTWARE.
         }
     }
 
-    function gotoPage(url) {
-        LS_putValue("expecting", url);
-    }
+    // ---------------------------- Main UI ----------------------------
 
-    function isExpectingPage(url) {
-        var expecting = LS_getValue("expecting");
-        if (expecting == url) {
-            LS_deleteValue("expecting");
-            setTimeout(function() {
-                if (url === urlrestart) return
-                console.log("RELOADING... " + url);
-                LS_putValue("expecting", url);
-                var script = document.createElement('script');
-                script.appendChild(document.createTextNode('location.reload();'));
-                document.body.appendChild(script);
-            }, 300000);
+    function UI() {
+        var tableTemplate = '' +
+            '<div>' + '<h1 style="text-align:center;color:#00a2e6;margin-bottom:20px;margin-top:60px;">' +
+            '<span>キーワード自動予約</span></h1>' +
+            '<div class="table__scroll--fixed"><table class="table__description th_head01"><tr>' +
+            '<th width="30%">キーワード</th>' +
+            '<th width="15%">番組ジャンル</th>' +
+            '<th width="15%">チャンネル</th>' +
+            '<th width="30%">除外ワード</th>' +
+            '<th width="5%"></th>' +
+            '<th width="5%"></th>' +
+            '</tr></table></div><div id="akr_option" style="padding:6px;">' +
+            '予約範囲：<select id="akr_days"><option>1</option><option>2</option><option>3</option>' +
+            '<option>4</option><option>5</option><option>6</option><option>7</option></select>日後まで　　' +
+            '<input type="checkbox" id="akr_rep" style="margin:20px 5px 20px 5px">' +
+            '<label id="akr_rep_text" for="akr_rep">予約を自動リピートする</label>' +
+            '<p class="text-center btn_chg">' +
+            '<input class="btn__default link--on-mouse" id="akr_start" value="自動予約">' +
+            '</p></div></div>';
+        var keywordTemplate1 = '' +
+            '<td style="padding:17px"><input type="text" class="l-border-light-blue" style="width:100%"></td>' +
+            '<td style="padding:17px"><input type="text" class="l-border-light-blue" style="width:100%"></td>' +
+            '<td style="padding:17px"><input type="text" class="l-border-light-blue" style="width:100%"></td>' +
+            '<td style="padding:17px"><input type="text" class="l-border-light-blue" style="width:100%"></td>' +
+            '<td style="padding:5px"><button>保存</button></td>';
+        var keywordTemplate2 = '' +
+            '<td class="text-left"></td>' +
+            '<td class="text-left"></td>' +
+            '<td class="text-left"></td>' +
+            '<td class="text-left"></td>' +
+            '<td style="padding:5px"><button>編集</button></td>' +
+            '<td style="padding:5px"><button>予約</button></td>';
+
+        var editAction = function(e) {
+            var oldTr = e.target.parentNode.parentNode;
+            var newTr = document.createElement("tr");
+            newTr.innerHTML = keywordTemplate1;
+            var tds = oldTr.getElementsByTagName("td");
+            var inputs = newTr.getElementsByTagName("input");
+            inputs[0]._originalValue = inputs[0].value = tds[0].textContent;
+            inputs[1]._originalValue = inputs[1].value = tds[1].textContent;
+            inputs[2]._originalValue = inputs[2].value = tds[2].textContent;
+            inputs[3]._originalValue = inputs[3].value = tds[3].textContent;
+            var button = newTr.getElementsByTagName("button")[0];
+            button.addEventListener('click', saveAction, false);
+            table.replaceChild(newTr, oldTr);
             return true;
         }
-        return false;
+
+        var start1Action = function(e) {
+            var tr = e.target.parentNode.parentNode;
+            var list = table.getElementsByTagName("tr");
+            for (var i = 0; i < list.length; i++) {
+                if (list[i] === tr) {
+                    console.log("start clicked " + i);
+                    e.target.disabled = true;
+                    LS_putValue("indexOfTheKeyword", i - 1);
+                    startAutoReserve();
+                    return true;
+                }
+            }
+            return true;
+        }
+
+        var saveAction = function(e) {
+            var oldTr = e.target.parentNode.parentNode;
+            var newTr = document.createElement("tr");
+            newTr.innerHTML = keywordTemplate2;
+            var tds = newTr.getElementsByTagName("td");
+            var inputs = oldTr.getElementsByTagName("input");
+            var keyword = tds[0].textContent = inputs[0].value;
+            tds[1].textContent = inputs[1].value;
+            tds[2].textContent = inputs[2].value;
+            tds[3].textContent = inputs[3].value;
+            var button = newTr.getElementsByTagName("button")[0];
+            button.addEventListener('click', editAction, false);
+            var button = newTr.getElementsByTagName("button")[1];
+            button.addEventListener('click', start1Action, false);
+            var trs = table.getElementsByTagName("tr");
+            for (var j = -1; j < trs.length - 1; j++) {
+                if (trs[j + 1] === oldTr) {
+                    break;
+                }
+            }
+            if (inputs[0]._originalValue != LS_getValue("keyword" + j)) {
+                return false;
+            }
+            if (e.target.textContent === "保存") {
+                if (keyword != "") {
+                    table.replaceChild(newTr, oldTr);
+                    LS_putValue("keyword" + j, tds[0].textContent);
+                    LS_putValue("genre" + j, tds[1].textContent);
+                    LS_putValue("channel" + j, tds[2].textContent);
+                    LS_putValue("except" + j, tds[3].textContent);
+                } else {
+                    table.removeChild(oldTr);
+                    for (;; j++) {
+                        LS_putValue("keyword" + j, k = LS_getValue("keyword" + (j + 1)));
+                        LS_putValue("genre" + j, LS_getValue("genre" + (j + 1)));
+                        LS_putValue("channel" + j, LS_getValue("channel" + (j + 1)));
+                        LS_putValue("except" + j, LS_getValue("except" + (j + 1)));
+                        if (k === "") {
+                            break;
+                        }
+                    }
+                }
+            } else if (e.target.textContent === "追加") {
+                if (keyword != "") {
+                    table.replaceChild(newTr, oldTr);
+                    inputs[0].value = "";
+                    inputs[1].value = "";
+                    inputs[2].value = "";
+                    inputs[3].value = "";
+                    table.appendChild(oldTr);
+                    LS_putValue("keyword" + j, tds[0].textContent);
+                    LS_putValue("genre" + j, tds[1].textContent);
+                    LS_putValue("channel" + j, tds[2].textContent);
+                    LS_putValue("except" + j, tds[3].textContent);
+                    LS_putValue("keyword" + (j + 1), "");
+                }
+            }
+            return true;
+        }
+        var clickAction = function(e) {
+            LS_putValue("automatic", options[0].checked);
+            if (!options[0].checked) {
+                LS_deleteValue("nextFire");
+                countDownTime = 0;
+                akr_rep_text.textContent = "予約を自動リピートする";
+            }
+            return true;
+        }
+        var countDownTime = 0;
+        var countDownRemain;
+        var countDown = function() {
+            if (countDownTime === 0) {
+                return;
+            }
+            var now = Date.now();
+            var sec = Math.floor((countDownTime - now) / 1000);
+            if (sec < countDownRemain) {
+                sec = --countDownRemain;
+            }
+            if (sec < 0) {
+                LS_putValue("indexOfTheKeyword", -1);
+                startAutoReserve();
+                return;
+            }
+            var min = Math.floor(sec / 60);
+            sec -= min * 60;
+            akr_rep_text.textContent = "予約を自動リピートする(あと" +
+                min + "分" + sec + "秒で自動的に予約を実行します)";
+            setTimeout(countDown, 1000);
+        }
+        var startAction = function() {
+            console.log("start clicked");
+            akr_start.disabled = true;
+            LS_putValue("indexOfTheKeyword", -1);
+            startAutoReserve();
+            return true;
+        }
+
+        var contents_member = document.getElementById("contents_member");
+        var div = document.createElement("div");
+        div.innerHTML = tableTemplate;
+        contents_member.appendChild(div);
+        var table = div.getElementsByTagName("table")[0];
+        for (var i = 0;; i++) {
+            var keyword = LS_getValue("keyword" + i);
+            if (keyword === "") {
+                break;
+            }
+            var tr = document.createElement("tr");
+            tr.innerHTML = keywordTemplate2;
+            var tds = tr.getElementsByTagName("td");
+            tds[0].textContent = keyword;
+            tds[1].textContent = LS_getValue("genre" + i);
+            tds[2].textContent = LS_getValue("channel" + i);
+            tds[3].textContent = LS_getValue("except" + i);
+            var button = tr.getElementsByTagName("button")[0];
+            button.addEventListener('click', editAction, false);
+            var button = tr.getElementsByTagName("button")[1];
+            button.addEventListener('click', start1Action, false);
+            table.appendChild(tr);
+        }
+        var tr = document.createElement("tr");
+        tr.innerHTML = keywordTemplate1;
+        var inputs = tr.getElementsByTagName("input");
+        inputs[0]._originalValue = "";
+        inputs[1]._originalValue = "";
+        inputs[2]._originalValue = "";
+        inputs[3]._originalValue = "";
+        var button = tr.getElementsByTagName("button")[0];
+        button.textContent = "追加";
+        button.addEventListener('click', saveAction, false);
+        table.appendChild(tr);
+        var akr_option = document.getElementById("akr_option");
+        var options = akr_option.getElementsByTagName("input");
+        options[0].checked = (LS_getValue("automatic") === "true");
+        options[0].addEventListener('click', clickAction, false);
+        var akr_days = document.getElementById("akr_days");
+        var days_index = parseInt(LS_getValue("akr_days"));
+        if (!(0 <= days_index && days_index <= 6)) {
+            days_index = 4;
+            LS_putValue("akr_days", days_index);
+        }
+        akr_days.selectedIndex = days_index;
+        akr_days.addEventListener('change', function() {
+            LS_putValue("akr_days", akr_days.selectedIndex);
+        }, false);
+        var akr_start = document.getElementById("akr_start");
+        akr_start.addEventListener('click', startAction, false);
+        var akr_rep_text = document.getElementById("akr_rep_text");
+        if (options[0].checked) {
+            var nextFire = LS_getValue("nextFire");
+            if (nextFire === "") {
+                return;
+            }
+            countDownTime = parseInt(nextFire);
+            countDownRemain = countDownThreshold;
+            countDown();
+        }
+        return;
     }
+
+    // ---------------------------- Utilities ----------------------------
 
     function strip(title) {
         return title.replace(/\s+/g, " ").replace(/^ | $/g, "");
@@ -270,69 +507,10 @@ THE SOFTWARE.
         return channo;
     }
 
-    var urlstart = "https://www.hikaritv.net/member/remote/reserve/regist";
-    var urllist = "https://www.hikaritv.net/member/remote/reserve/list";
-    var urlsearch = "https://www.hikaritv.net/#/search";
-    var urldetail = "https://www.hikaritv.net/#/tv/detail";
-    var urldelcomp = "https://www.hikaritv.net/member/remote/reserve/delete_complete";
-    var urlcancomp = "https://www.hikaritv.net/member/remote/reserve/cancel_complete"; // pseudo URL
-    var urlrestart = "https://www.hikaritv.net/member/remote/reserve/restart"; // pseudo URL
-    var urllogin = "https://accounts.hikaritv.net/member/login";
-    var urllogincomp = "https://accounts.hikaritv.net/member/login_do";
-
-    // Main functions
-    function parseReservationList() {
-        try {
-            var table = document.getElementsByTagName("table")[0];
-            var list = table.getElementsByTagName("tr");
-            for (var i = 1; i < list.length; i++) {
-                try {
-                    var tds = list[i].getElementsByTagName("td");
-                    var range = parseTimeRange(tds[1].textContent);
-                    var channo = parseChannel(tds[3].textContent);
-                    var start = new Date(range[0]).toISOString();
-                    var end = new Date(range[1]).toISOString();
-                    var title = tds[2].textContent;
-                    title = stripconv(title);
-                    var state = tds[4].textContent;
-                    if (state.indexOf("○") >= 0) {
-                        var code = encode(title);
-                        R_DB.put(code, range[0]);
-                        T_DB.put(range[0] + range[1] + channo, 3);
-                    } else if (state.indexOf("−") >= 0) {
-                        var code = encode(title);
-                        T_DB.put(code, 1);
-                    } else if (state.indexOf("×") >= 0) {
-                        D_DB.put(range[0] + range[1] + channo, 3);
-                    } else {
-                        console.log("UNKNOWN STATE:" + state + ":" + title);
-                    }
-                } catch (e) {
-                    console.log("EXCEPTION:parseReservationList:" + e);
-                }
-            }
-        } catch (e) {
-            console.log("EXCEPTION:parseReservationList:" + e);
-        }
-        try {
-            console.log("nextList");
-            var p = document.getElementsByClassName("next")[0];
-            var href = p.getElementsByTagName("a")[0].href;
-            setTimeout(function() {
-                gotoPage(urllist);
-                location.href = href;
-            }, clickTimeout);
-            return;
-        } catch (e) {
-            console.log("no next list");
-        }
-        nextKeyword(true);
-    }
-
     function checkTitlePre1(title, channo) {
-        var keywordIndex = parseInt(LS_getValue("indexOfKeywords"));
-        var channelREX = new RegExp(channel_source = stripconv(LS_getValue("channel" + keywordIndex)), "i");
-        var exceptREX = new RegExp(stripconv(LS_getValue("except" + keywordIndex)), "i");
+        var indexOfKeywords = parseInt(LS_getValue("indexOfKeywords"));
+        var channelREX = new RegExp(channel_source = stripconv(LS_getValue("channel" + indexOfKeywords)), "i");
+        var exceptREX = new RegExp(stripconv(LS_getValue("except" + indexOfKeywords)), "i");
         var code = encode(title);
         if (exceptREX.test(title) && exceptREX.exec(title)[0].length > 0) {
             console.log("except:" + title)
@@ -361,10 +539,10 @@ THE SOFTWARE.
     }
 
     function checkTitle(title, range, genre, channel, isPremium) {
-        var keywordIndex = parseInt(LS_getValue("indexOfKeywords"));
-        var genreREX = new RegExp(stripconv(LS_getValue("genre" + keywordIndex)), "i");
-        var channelREX = new RegExp(channel_source = stripconv(LS_getValue("channel" + keywordIndex)), "i");
-        var exceptREX = new RegExp(stripconv(LS_getValue("except" + keywordIndex)), "i");
+        var indexOfKeywords = parseInt(LS_getValue("indexOfKeywords"));
+        var genreREX = new RegExp(stripconv(LS_getValue("genre" + indexOfKeywords)), "i");
+        var channelREX = new RegExp(channel_source = stripconv(LS_getValue("channel" + indexOfKeywords)), "i");
+        var exceptREX = new RegExp(stripconv(LS_getValue("except" + indexOfKeywords)), "i");
         var channel_source;
         var channo = parseChannel(channel);
         var code = encode(title);
@@ -418,597 +596,481 @@ THE SOFTWARE.
         return true;
     }
 
-    var expandSearchResultCount = 0;
-    var chimgREX = new RegExp("https://www.hikaritv.net/resources/hikari/pc/images/ch_logo/ch[0-9]+/([0-9]{3,3}).png");
-    var errorCount = 0;
-
-    function parseSearchResult() {
-        try {
-            var div_tab_tv = document.getElementById("tab-tv");
-            var ul = div_tab_tv.getElementsByClassName("search-list")[0];
-            if (!ul) {
-                if (document.getElementsByClassName("seach-error")[0]) {
-                    nextKeyword();
-                    return;
-                }
-                if (errorCount++ > 100) {
-                    nextKeyword();
-                    return;
-                }
-                setTimeout(parseSearchResult, pollingTimeout);
-                return;
-            }
-            var wall = div_tab_tv.getElementsByClassName("search-result-wall")[0];
-            var inp = wall.getElementsByTagName("input")[0];
-            if (inp.value == "さらに表示する" &&
-                Array.prototype.indexOf.call(inp.classList, "js-hide") < 0 && ++expandSearchResultCount <= 10) {
-                console.log("expand search result")
+    function isExpectingPage() {
+        var expecting = LS_getValue("expecting");
+        for (var i = 0; i < arguments.length; i++) {
+            var page = arguments[i];
+            if (expecting === page) {
+                LS_deleteValue("expecting");
                 setTimeout(function() {
-                    inp.click();
-                    setTimeout(parseSearchResult, displayTimeout);
+                    if (page === "done") return
+                    console.log("RELOADING... " + document.URL);
+                    LS_putValue("expecting", page);
+                    var script = document.createElement('script');
+                    script.appendChild(document.createTextNode('location.reload();'));
+                    document.body.appendChild(script);
+                }, 300000);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // ---------------------------- Parsers & Handlers ----------------------------
+
+    var pollingCount = 0;
+    var expandCount = 0;
+
+    function handleExpiredReservation(resolve, reject) {
+        var tables = document.getElementsByTagName("table");
+        for (table of tables) {
+            var asl = table.getElementsByTagName("a");
+            for (var i = 0; i < asl.length; i++) {
+                if (asl[i].textContent != "×") {
+                    continue;
+                }
+                var onclick = asl[i].getAttribute("onClick");
+                debug("goto delete expired reservation");
+                LS_putValue("expecting", "delete_complete");
+                setTimeout(function() {
+                    var delReservedData = unsafeWindow.delReservedData;
+                    unsafeWindow.confirm = unsafeWindow.String;
+                    eval('{' + onclick + '}');
                 }, clickTimeout);
                 return;
             }
-
-            var list = ul.getElementsByTagName("li");
-            var titles = [];
-            for (var i = 0; i < list.length; i++) {
-                var title = stripconv(list[i].textContent);
-                var crid = list[i].getAttribute("data-href").split('&')[1];
-                if (!crid || !title) continue;
-                var img = list[i].getElementsByTagName("img")[0];
-                var src = img.getAttribute("src");
-                var m = src.match(chimgREX);
-                if (m && m[1]) {
-                    var channo = m[1];
-                }
-                if (!checkTitlePre1(title, channo)) {
-                    continue;
-                }
-                titles.push(title);
-                titles.push(crid);
-            }
-            parseSearchDetail(titles);
-        } catch (e) {
-            console.log("EXCEPTION:parseSearchResult:" + e);
         }
+        console.log("no items to delete");
+        resolve();
     }
 
-    function parseSearchDetail(titles) {
-        while (true) {
-            var title = titles.shift();
-            var crid = titles.shift();
-            if (!crid) {
-                nextKeyword();
-                return;
-            }
-            if (!checkTitlePre2(title)) {
-                continue;
-            }
-            setTimeout(function() {
-                gotoPage(urlsearch);
-                location.href = "#/tv/detail/" + crid;
-                setTimeout(parser, displayTimeout);
-            }, clickTimeout);
-            return;
-        }
-
-        function parser() {
-            var ctts = document.getElementById("tvDetail-ctts");
-            if (!ctts) {
-                setTimeout(parser, pollingTimeout);
-                return;
-            }
-            var section = ctts.getElementsByTagName("section")[0];
-            if (!section) {
-                var div = ctts.getElementsByClassName("error-report")[0];
-                if (div) {
-                    console.log("not found:" + title);
-                    console.log(div.textContent)
-                    parseSearchDetail(titles);
-                    return;
-                }
-                setTimeout(parser, pollingTimeout);
-                return;
-            }
-            var record_area = section.getElementsByClassName("record_area")[0];
-            var record_area_a = record_area.getElementsByTagName("a")[0];
-            var h3 = ctts.getElementsByClassName("mdConts_tabInner_title")[0];
-            var table = section.getElementsByTagName("table")[0];
-            var tds = section.getElementsByTagName("td");
-            var title1 = stripconv(h3.textContent);
-            var range = parseTimeRange2(tds[0].textContent);
-            var genre = stripconv(tds[1].textContent);
-            var channel = stripconv(tds[2].textContent);
-            if (!record_area_a) {
-                console.log("not recordable:" + title);
-                parseSearchDetail(titles);
-                return;
-            }
-            if (strip(record_area.textContent) == "録画予約済み") {
-                console.log("already reserved:" + title);
+    function parseReservationList(resolve, reject) {
+        var table = document.getElementsByTagName("table")[0];
+        var list = table.getElementsByTagName("tr");
+        for (var i = 1; i < list.length; i++) {
+            var tds = list[i].getElementsByTagName("td");
+            var range = parseTimeRange(tds[1].textContent);
+            var channo = parseChannel(tds[3].textContent);
+            var start = new Date(range[0]).toISOString();
+            var end = new Date(range[1]).toISOString();
+            var title = tds[2].textContent;
+            title = stripconv(title);
+            var state = tds[4].textContent;
+            trace("reservation list", title, channo, start, end, state);
+            if (state.indexOf("○") >= 0) {
                 var code = encode(title);
                 R_DB.put(code, range[0]);
-                parseSearchDetail(titles);
-                return;
+                T_DB.put(range[0] + range[1] + channo, 3);
+            } else if (state.indexOf("−") >= 0) {
+                var code = encode(title);
+                T_DB.put(code, 1);
+            } else if (state.indexOf("×") >= 0) {
+                D_DB.put(range[0] + range[1] + channo, 3);
+            } else {
+                console.log("UNKNOWN STATE:" + state + ":" + title);
             }
-            var crid1 = record_area_a.getAttribute("data-crid");
-            if (crid != crid1) {
-                setTimeout(parser, pollingTimeout);
-                return;
-            }
-            if (strip(record_area.textContent) != "録画予約") {
-                console.log("not recordable:" + title);
-                parseSearchDetail(titles);
-                return;
-            }
-            if (title != title1) {
-                console.log("UNEXPECTED: " + title1 + " EXPECTED: " + title);
-                parseSearchDetail(titles);
-                return;
-            }
-            var attrs1 = section.getElementsByClassName("mdConts-attibute")[0];
-            var attrs = attrs1.children[0].children;
-            for (attr of attrs) {
-                if (attr.textContent == "プレミアムチャンネル") {
-                    var isPremium = true;
-                }
-            }
-            if (!checkTitle(title, range, genre, channel, isPremium)) {
-                parseSearchDetail(titles);
-                return;
-            }
-            var start = new Date(range[0]).toISOString();
-            console.log("going to reserve:" + start + " " + title);
-            setTimeout(function() {
-                gotoPage(urllogin);
-                record_area_a.click();
-                setTimeout(confirm_reservation, displayTimeout);
-            }, clickTimeout);
         }
-
-        function confirm_reservation() {
-            var ctts = document.getElementById("tvReserveRecordingConfirm-ctts");
-            if (!ctts) {
-                setTimeout(confirm_reservation, pollingTimeout);
-                return;
-            }
-            var btn = document.getElementsByClassName("btn-remote-reserve-rec")[0];
-            var btn_a = btn.getElementsByTagName("a")[0];
-            setTimeout(function() {
-                console.log("confirming");
-                gotoPage(urllogin);
-                btn_a.click();
-                setTimeout(wait_complete_reservation, displayTimeout);
-            }, clickTimeout);
-        }
-
-        function wait_complete_reservation() {
-            var ctts = document.getElementById("tvReserveRecordingComplete-ctts");
-            if (!ctts) {
-                setTimeout(wait_complete_reservation, pollingTimeout);
-                return;
-            }
-            reservingTitle(title);
-            console.log("reservation completed " + title);
-            parseSearchDetail(titles);
-        }
-
-    }
-
-    function nextKeyword(retry) {
-        if (!retry) {
-            var keywordIndex = parseInt(LS_getValue("indexOfKeywords"));
-            LS_putValue("indexOfKeywords", keywordIndex - 1);
-        }
-        setTimeout(function() {
-            gotoPage(urldelcomp);
-            location.href = urllist + "?disp=now";
-        }, clickTimeout);
-    }
-
-    function searchKeyword() {
+        if (!resolve) return;
         try {
-            var form = document.getElementById("v2-hikari__h_search_form");
-            if (!form) {
-                setTimeout(searchKeyword, pollingTimeout);
-                return;
-            }
-            var keywordIndex = parseInt(LS_getValue("indexOfKeywords"));
-            if (!(keywordIndex >= 0)) {
-                done1();
-                return;
-            }
-            var keywordIndex1 = parseInt(LS_getValue("keywordIndex1"));
-            if (keywordIndex1 >= 0) {
-                if (keywordIndex < keywordIndex1) {
-                    done1();
-                    return;
-                }
-                keywordIndex = keywordIndex1;
-                LS_putValue("indexOfKeywords", keywordIndex);
-            }
-            var keyword = strip(LS_getValue("keyword" + keywordIndex));
-            console.log("keyword:" + keyword);
-            var textbox = form.getElementsByTagName("input")[0];
-            textbox.value = keyword;
-            var submit = form.getElementsByTagName("input")[1];
-            setTimeout(function() {
-                gotoPage(urlsearch);
-                submit.click();
-            }, clickTimeout);
-        } catch (e) {
-            console.log("EXCEPTION:searchKeyword:" + e);
-        }
-    }
-
-    function done1() {
-        console.log("DONE");
-        setTimeout(function() {
-            gotoPage(urlrestart);
-            location.href = urlstart;
-        }, clickTimeout);
-    }
-
-    function handleDeleteReservation() {
-        try {
-            var tables = document.getElementsByTagName("table");
-            for (table of tables) {
-                var asl = table.getElementsByTagName("a");
-                for (var i = 0; i < asl.length; i++) {
-                    try {
-                        if (asl[i].textContent != "×") {
-                            continue;
-                        }
-                        var onclick = asl[i].getAttribute("onClick");
-                        gotoPage(urldelcomp);
-                        setTimeout(function() {
-                            var delReservedData = unsafeWindow.delReservedData;
-                            unsafeWindow.confirm = unsafeWindow.String;
-                            eval('{' + onclick + '}');
-                        }, clickTimeout);
-                        return;
-                    } catch (e) {
-                        console.log("EXCEPTION:handleDeleteReservation:" + e);
-                    }
-                }
-            }
-        } catch (e) {}
-        console.log("no items to delete");
-        searchKeyword();
-    }
-
-    function handleCancelReservation() {
-        try {
-            var tables = document.getElementsByTagName("table");
-            for (table of tables) {
-                var asl = table.getElementsByTagName("a");
-                for (var i = 0; i < asl.length; i++) {
-                    try {
-                        if (asl[i].textContent != "×") {
-                            continue;
-                        }
-                        var onclick = asl[i].getAttribute("onClick");
-                        gotoPage(urlcancomp);
-                        setTimeout(function() {
-                            var delReservedData = unsafeWindow.delReservedData;
-                            unsafeWindow.confirm = unsafeWindow.String;
-                            eval('{' + onclick + '}');
-                        }, clickTimeout);
-                        return;
-                    } catch (e) {
-                        console.log("EXCEPTION:handleCancelReservation:" + e);
-                    }
-                }
-            }
-        } catch (e) {}
-        try {
-            console.log("next cancel list");
             var p = document.getElementsByClassName("next")[0];
             var href = p.getElementsByTagName("a")[0].href;
             setTimeout(function() {
-                gotoPage(urlcancomp);
+                debug("goto next reservation list");
+                LS_putValue("expecting", "reservation_list");
                 location.href = href;
             }, clickTimeout);
             return;
         } catch (e) {}
-        console.log("no items to cancel");
-        location.href = urllist + "?disp=before";
-        return true;
+        resolve();
+    }
+
+    function parseSearchResult(resolve, reject) {
+        var div_tab_tv = document.getElementById("tab-tv");
+        var ul = div_tab_tv.getElementsByClassName("search-list")[0];
+        if (!ul) {
+            if (document.getElementsByClassName("seach-error")[0]) {
+                reject();
+                return;
+            }
+            if (++pollingCount >= 100) {
+                console.log("WARN: parseSearchResult polling timeout")
+                reject();
+                return;
+            }
+            setTimeout(parseSearchResult, pollingTimeout, resolve, reject);
+            return;
+        }
+        var wall = div_tab_tv.getElementsByClassName("search-result-wall")[0];
+        var inp = wall.getElementsByTagName("input")[0];
+        if (inp.value === "さらに表示する" && Array.prototype.indexOf.call(inp.classList, "js-hide") < 0 && ++expandCount <= 10) {
+            setTimeout(function() {
+                debug("goto show more results");
+                inp.click();
+                setTimeout(parseSearchResult, displayTimeout, resolve, reject);
+            }, clickTimeout);
+            return;
+        }
+
+        var chimgREX = new RegExp("https://www.hikaritv.net/resources/hikari/pc/images/ch_logo/ch[0-9]+/([0-9]{3,3}).png");
+        var indexOfKeywords = parseInt(LS_getValue("indexOfKeywords"));
+        var keyword = strip(LS_getValue("keyword" + indexOfKeywords));
+        var list = ul.getElementsByTagName("li");
+        var indexOfTitles = 0;
+        for (var i = 0; i < list.length; i++) {
+            var title = stripconv(list[i].textContent);
+            var crid = list[i].getAttribute("data-href").split('&')[1];
+            if (!crid || !title) continue;
+            var img = list[i].getElementsByTagName("img")[0];
+            var src = img.getAttribute("src");
+            var m = src.match(chimgREX);
+            if (m && m[1]) {
+                var channo = m[1];
+            }
+            if (!checkTitlePre1(title, channo)) {
+                continue;
+            }
+            trace("search result", title, crid)
+            LS_putValue("title" + indexOfTitles, title);
+            LS_putValue("crid" + indexOfTitles, crid);
+            indexOfTitles++;
+        }
+        LS_putValue("indexOfTitles", indexOfTitles);
+        resolve();
+    }
+
+    function handleTitleDetail(resolve, reject) {
+        var indexOfTitles = parseInt(LS_getValue("indexOfTitles"));
+        var title = LS_getValue("title" + indexOfTitles);
+        var crid = LS_getValue("crid" + indexOfTitles);
+        var ctts = document.getElementById("tvDetail-ctts");
+        if (!ctts) {
+            if (++pollingCount >= 100) {
+                console.log("WARN: handleTitleDetail polling timeout")
+                reject();
+                return;
+            }
+            setTimeout(handleTitleDetail, pollingTimeout, resolve, reject);
+            return;
+        }
+        var section = ctts.getElementsByTagName("section")[0];
+        if (!section) {
+            var div = ctts.getElementsByClassName("error-report")[0];
+            if (div) {
+                console.log("not found:" + title);
+                console.log(div.textContent)
+                reject();
+                return;
+            }
+            if (++pollingCount >= 100) {
+                console.log("WARN: handleTitleDetail polling timeout")
+                reject();
+                return;
+            }
+            setTimeout(handleTitleDetail, pollingTimeout, resolve, reject);
+            return;
+        }
+
+        var record_area = section.getElementsByClassName("record_area")[0];
+        var record_area_a = record_area.getElementsByTagName("a")[0];
+        var h3 = ctts.getElementsByClassName("mdConts_tabInner_title")[0];
+        var table = section.getElementsByTagName("table")[0];
+        var tds = section.getElementsByTagName("td");
+        var title1 = stripconv(h3.textContent);
+        var range = parseTimeRange2(tds[0].textContent);
+        var genre = stripconv(tds[1].textContent);
+        var channel = stripconv(tds[2].textContent);
+        if (!record_area_a) {
+            console.log("not recordable:" + title);
+            reject();
+            return;
+        }
+        if (strip(record_area.textContent) === "録画予約済み") {
+            console.log("already reserved:" + title);
+            var code = encode(title);
+            R_DB.put(code, range[0]);
+            reject();
+            return;
+        }
+        var crid1 = record_area_a.getAttribute("data-crid");
+        if (crid != crid1) {
+            console.log("ASSERT: crid mismatch", crid, crid1);
+            reject();
+            return;
+        }
+        if (strip(record_area.textContent) != "録画予約") {
+            console.log("not recordable:" + title);
+            reject();
+            return;
+        }
+        if (title != title1) {
+            console.log("UNEXPECTED: " + title1 + " EXPECTED: " + title);
+            reject();
+            return;
+        }
+        var attrs1 = section.getElementsByClassName("mdConts-attibute")[0];
+        var attrs = attrs1.children[0].children;
+        for (attr of attrs) {
+            if (attr.textContent === "プレミアムチャンネル") {
+                var isPremium = true;
+            }
+        }
+        if (!checkTitle(title, range, genre, channel, isPremium)) {
+            reject();
+            return;
+        }
+        setTimeout(function() {
+            var start = new Date(range[0]).toISOString();
+            console.log("going to reserve:" + start + " " + title);
+            LS_putValue("expecting", "reserve_recording");
+            record_area_a.click();
+            setTimeout(handleConfirmReservation, displayTimeout, nextTitle, nextTitle);
+        }, clickTimeout);
+    }
+
+    function handleConfirmReservation(resolve, reject) {
+        var ctts = document.getElementById("tvReserveRecordingConfirm-ctts");
+        if (!ctts) {
+            if (++pollingCount >= 100) {
+                console.log("WARN: handleConfirmReservation polling timeout")
+                reject();
+                return;
+            }
+            setTimeout(handleConfirmReservation, pollingTimeout, resolve, reject);
+            return;
+        }
+        var btn = document.getElementsByClassName("btn-remote-reserve-rec")[0];
+        var btn_a = btn.getElementsByTagName("a")[0];
+        setTimeout(function() {
+            console.log("confirming record-reservation");
+            LS_putValue("expecting", "confirm_recording");
+            btn_a.click();
+            setTimeout(handleCompleteReservation, displayTimeout, nextTitle, nextTitle);
+        }, clickTimeout);
+    }
+
+    function handleCompleteReservation(resolve, reject) {
+        var ctts = document.getElementById("tvReserveRecordingComplete-ctts");
+        if (!ctts) {
+            if (++pollingCount >= 100) {
+                console.log("WARN: handleCompleteReservation polling timeout")
+                reject();
+                return;
+            }
+            setTimeout(handleCompleteReservation, pollingTimeout, resolve, reject);
+            return;
+        }
+        var indexOfTitles = parseInt(LS_getValue("indexOfTitles"));
+        var title = LS_getValue("title" + indexOfTitles);
+        reservingTitle(title);
+        console.log("reservation completed " + title);
+        resolve();
+    }
+
+    // ---------------------------- Main transitions ----------------------------
+
+    console.log("entering " + document.URL + " expecting " + LS_getValue("expecting"));
+
+    if (document.URL.indexOf(url_entry) === 0) {
+        if (isExpectingPage("done")) {
+            LS_putValue("nextFire", Date.now() + auto_reserve_interval);
+        }
+        LS_deleteValue("expecting");
+        UI();
+        return;
     }
 
     function startAutoReserve() {
-        try {
-            console.log("start auto reserve");
-            LS_deleteValue("nextFire");
-            T_DB.clearAll();
-            D_DB.clearAll();
-            R_DB.clearLess(Date.now() - history);
-            for (var keywordIndex = 0;; keywordIndex++) {
-                var keyword = strip(LS_getValue("keyword" + keywordIndex));
-                if (keyword == "") {
-                    break;
-                }
-            }
-            LS_putValue("indexOfKeywords", keywordIndex - 1);
-            gotoPage(urllist);
-            location.href = urllist + "?disp=before";
-        } catch (e) {
-            console.log("EXCEPTION:" + e)
-            console.log("STACK:" + e.stack)
-        }
+        console.log("start auto reserve");
+        LS_deleteValue("nextFire");
+        T_DB.clearAll();
+        D_DB.clearAll();
+        R_DB.clearLess(Date.now() - history);
+        debug("goto expired reservation list");
+        LS_putValue("expecting", "expired_list");
+        location.href = url_expired_list;
     }
 
-    // Main UI
-    function akr_UI() {
-        try {
-            var tableTemplate = '' +
-                '<div>' + '<h1 style="text-align:center;color:#00a2e6;margin-bottom:20px;margin-top:60px;">' +
-                '<span>キーワード自動予約</span></h1>' +
-                '<div class="table__scroll--fixed"><table class="table__description th_head01"><tr>' +
-                '<th width="30%">キーワード</th>' +
-                '<th width="15%">番組ジャンル</th>' +
-                '<th width="15%">チャンネル</th>' +
-                '<th width="30%">除外ワード</th>' +
-                '<th width="5%"></th>' +
-                '<th width="5%"></th>' +
-                '</tr></table></div><div id="akr_option" style="padding:6px;">' +
-                '予約範囲：<select id="akr_days"><option>1</option><option>2</option><option>3</option>' +
-                '<option>4</option><option>5</option><option>6</option><option>7</option></select>日後まで　　' +
-                '<input type="checkbox" id="akr_rep" style="margin:20px 5px 20px 5px">' +
-                '<label id="akr_rep_text" for="akr_rep">予約を自動リピートする</label>' +
-                '<p class="text-center btn_chg">' +
-                '<input class="btn__default link--on-mouse" id="akr_start" value="自動予約">' +
-                '</p></div></div>';
-            var keywordTemplate1 = '' +
-                '<td style="padding:17px"><input type="text" class="l-border-light-blue" style="width:100%"></td>' +
-                '<td style="padding:17px"><input type="text" class="l-border-light-blue" style="width:100%"></td>' +
-                '<td style="padding:17px"><input type="text" class="l-border-light-blue" style="width:100%"></td>' +
-                '<td style="padding:17px"><input type="text" class="l-border-light-blue" style="width:100%"></td>' +
-                '<td style="padding:5px"><button>保存</button></td>';
-            var keywordTemplate2 = '' +
-                '<td class="text-left"></td>' +
-                '<td class="text-left"></td>' +
-                '<td class="text-left"></td>' +
-                '<td class="text-left"></td>' +
-                '<td style="padding:5px"><button>編集</button></td>' +
-                '<td style="padding:5px"><button>予約</button></td>';
+    if (document.URL.indexOf(url_expired_list) === 0 && isExpectingPage("expired_list")) {
+        console.log("deleting expired reservation...");
+        handleExpiredReservation(startSearchKeywords);
+        return;
+    }
 
-            var editAction = function(e) {
-                var oldTr = e.target.parentNode.parentNode;
-                var newTr = document.createElement("tr");
-                newTr.innerHTML = keywordTemplate1;
-                var tds = oldTr.getElementsByTagName("td");
-                var inputs = newTr.getElementsByTagName("input");
-                inputs[0]._originalValue = inputs[0].value = tds[0].textContent;
-                inputs[1]._originalValue = inputs[1].value = tds[1].textContent;
-                inputs[2]._originalValue = inputs[2].value = tds[2].textContent;
-                inputs[3]._originalValue = inputs[3].value = tds[3].textContent;
-                var button = newTr.getElementsByTagName("button")[0];
-                button.addEventListener('click', saveAction, false);
-                table.replaceChild(newTr, oldTr);
-                return true;
-            }
+    if (document.URL.indexOf(url_delete_complete) === 0 && isExpectingPage("delete_complete")) {
+        handleExpiredReservation(startSearchKeywords);
+        return;
+    }
 
-            var start1Action = function(e) {
-                var tr = e.target.parentNode.parentNode;
-                var list = table.getElementsByTagName("tr");
-                for (var i = 0; i < list.length; i++) {
-                    if (list[i] === tr) {
-                        console.log("start clicked " + i);
-                        e.target.disabled = true;
-                        LS_putValue("keywordIndex1", i - 1);
-                        startAutoReserve();
-                        return true;
-                    }
-                }
-                return true;
+    function startSearchKeywords() {
+        for (var indexOfKeywords = 0;; indexOfKeywords++) {
+            var keyword = strip(LS_getValue("keyword" + indexOfKeywords));
+            if (keyword === "") {
+                break;
             }
+        }
+        LS_putValue("indexOfKeywords", indexOfKeywords);
+        searchLoopEntry();
+    }
 
-            var saveAction = function(e) {
-                var oldTr = e.target.parentNode.parentNode;
-                var newTr = document.createElement("tr");
-                newTr.innerHTML = keywordTemplate2;
-                var tds = newTr.getElementsByTagName("td");
-                var inputs = oldTr.getElementsByTagName("input");
-                var keyword = tds[0].textContent = inputs[0].value;
-                tds[1].textContent = inputs[1].value;
-                tds[2].textContent = inputs[2].value;
-                tds[3].textContent = inputs[3].value;
-                var button = newTr.getElementsByTagName("button")[0];
-                button.addEventListener('click', editAction, false);
-                var button = newTr.getElementsByTagName("button")[1];
-                button.addEventListener('click', start1Action, false);
-                var trs = table.getElementsByTagName("tr");
-                for (var j = -1; j < trs.length - 1; j++) {
-                    if (trs[j + 1] == oldTr) {
-                        break;
-                    }
-                }
-                if (inputs[0]._originalValue != LS_getValue("keyword" + j)) {
-                    return false;
-                }
-                if (e.target.textContent == "保存") {
-                    if (keyword != "") {
-                        table.replaceChild(newTr, oldTr);
-                        LS_putValue("keyword" + j, tds[0].textContent);
-                        LS_putValue("genre" + j, tds[1].textContent);
-                        LS_putValue("channel" + j, tds[2].textContent);
-                        LS_putValue("except" + j, tds[3].textContent);
-                    } else {
-                        table.removeChild(oldTr);
-                        for (;; j++) {
-                            LS_putValue("keyword" + j, k = LS_getValue("keyword" + (j + 1)));
-                            LS_putValue("genre" + j, LS_getValue("genre" + (j + 1)));
-                            LS_putValue("channel" + j, LS_getValue("channel" + (j + 1)));
-                            LS_putValue("except" + j, LS_getValue("except" + (j + 1)));
-                            if (k == "") {
-                                break;
-                            }
-                        }
-                    }
-                } else if (e.target.textContent == "追加") {
-                    if (keyword != "") {
-                        table.replaceChild(newTr, oldTr);
-                        inputs[0].value = "";
-                        inputs[1].value = "";
-                        inputs[2].value = "";
-                        inputs[3].value = "";
-                        table.appendChild(oldTr);
-                        LS_putValue("keyword" + j, tds[0].textContent);
-                        LS_putValue("genre" + j, tds[1].textContent);
-                        LS_putValue("channel" + j, tds[2].textContent);
-                        LS_putValue("except" + j, tds[3].textContent);
-                        LS_putValue("keyword" + (j + 1), "");
-                    }
-                }
-                return true;
-            }
-            var clickAction = function(e) {
-                LS_putValue("automatic", options[0].checked);
-                if (!options[0].checked) {
-                    LS_deleteValue("nextFire");
-                    countDownTime = 0;
-                    akr_rep_text.textContent = "予約を自動リピートする";
-                }
-                return true;
-            }
-            var countDownTime = 0;
-            var countDownRemain;
-            var countDown = function() {
-                if (countDownTime == 0) {
-                    return;
-                }
-                var now = Date.now();
-                var sec = Math.floor((countDownTime - now) / 1000);
-                if (sec < countDownRemain) {
-                    sec = --countDownRemain;
-                }
-                if (sec < 0) {
-                    LS_putValue("keywordIndex1", -1);
-                    startAutoReserve();
-                    return;
-                }
-                var min = Math.floor(sec / 60);
-                sec -= min * 60;
-                akr_rep_text.textContent = "予約を自動リピートする(あと" +
-                    min + "分" + sec + "秒で自動的に予約を実行します)";
-                setTimeout(countDown, 1000);
-            }
-            var startAction = function() {
-                console.log("start clicked");
-                akr_start.disabled = true;
-                LS_putValue("keywordIndex1", -1);
-                startAutoReserve();
-                return true;
-            }
+    function searchLoopEntry() {
+        setTimeout(function() {
+            debug("goto reservation list");
+            LS_putValue("expecting", "reservation_list");
+            location.href = url_reservation_list;
+        }, clickTimeout);
+    }
 
-            var contents_member = document.getElementById("contents_member");
-            var div = document.createElement("div");
-            div.innerHTML = tableTemplate;
-            contents_member.appendChild(div);
-            var table = div.getElementsByTagName("table")[0];
-            for (var i = 0;; i++) {
-                var keyword = LS_getValue("keyword" + i);
-                if (keyword == "") {
-                    break;
-                }
-                var tr = document.createElement("tr");
-                tr.innerHTML = keywordTemplate2;
-                var tds = tr.getElementsByTagName("td");
-                tds[0].textContent = keyword;
-                tds[1].textContent = LS_getValue("genre" + i);
-                tds[2].textContent = LS_getValue("channel" + i);
-                tds[3].textContent = LS_getValue("except" + i);
-                var button = tr.getElementsByTagName("button")[0];
-                button.addEventListener('click', editAction, false);
-                var button = tr.getElementsByTagName("button")[1];
-                button.addEventListener('click', start1Action, false);
-                table.appendChild(tr);
+    if (document.URL.indexOf(url_reservation_list) === 0 && isExpectingPage("reservation_list")) {
+        parseReservationList(function() {
+            if (nextKeyword0()) {
+                searchKeyword();
+                return;
             }
-            var tr = document.createElement("tr");
-            tr.innerHTML = keywordTemplate1;
-            var inputs = tr.getElementsByTagName("input");
-            inputs[0]._originalValue = "";
-            inputs[1]._originalValue = "";
-            inputs[2]._originalValue = "";
-            inputs[3]._originalValue = "";
-            var button = tr.getElementsByTagName("button")[0];
-            button.textContent = "追加";
-            button.addEventListener('click', saveAction, false);
-            table.appendChild(tr);
-            var akr_option = document.getElementById("akr_option");
-            var options = akr_option.getElementsByTagName("input");
-            options[0].checked = (LS_getValue("automatic") == "true");
-            options[0].addEventListener('click', clickAction, false);
-            var akr_days = document.getElementById("akr_days");
-            var days_index = parseInt(LS_getValue("akr_days"));
-            if (!(0 <= days_index && days_index <= 6)) {
-                days_index = 4;
-                LS_putValue("akr_days", days_index);
+            setTimeout(function() {
+                console.log("DONE");
+                LS_putValue("expecting", "done");
+                location.href = url_entry;
+            }, clickTimeout);
+        });
+        return;
+    }
+
+    if (document.URL.indexOf(url_reservation_list) === 0) {
+        parseReservationList()
+    }
+
+    function nextKeyword() {
+        debug("nextKeyword");
+        searchLoopEntry();
+    }
+
+    function nextKeyword0() {
+        var indexOfKeywords = parseInt(LS_getValue("indexOfKeywords"));
+        if (!(indexOfKeywords >= 0)) {
+            console.log("ERROR: indexOfKeywords == " + indexOfKeywords)
+            return false;
+        }
+        var indexOfTheKeyword = parseInt(LS_getValue("indexOfTheKeyword"));
+        if (indexOfTheKeyword >= 0) {
+            if (indexOfKeywords <= indexOfTheKeyword) {
+                return false;
             }
-            akr_days.selectedIndex = days_index;
-            akr_days.addEventListener('change', function() {
-                LS_putValue("akr_days", akr_days.selectedIndex);
-            }, false);
-            var akr_start = document.getElementById("akr_start");
-            akr_start.addEventListener('click', startAction, false);
-            var akr_rep_text = document.getElementById("akr_rep_text");
-            if (options[0].checked) {
-                var nextFire = LS_getValue("nextFire");
-                if (nextFire == "") {
-                    return;
-                }
-                countDownTime = parseInt(nextFire);
-                countDownRemain = countDownThreshold;
-                countDown();
+            indexOfKeywords = indexOfTheKeyword;
+        } else {
+            if (indexOfKeywords === 0) {
+                return false;
             }
+            indexOfKeywords--;
+        }
+        LS_putValue("indexOfKeywords", indexOfKeywords);
+        return true;
+    }
+
+    function searchKeyword() {
+        debug("searchKeyword");
+        var form = document.getElementById("v2-hikari__h_search_form");
+        if (!form) {
+            if (++pollingCount >= 100) {
+                console.log("WARN: searchKeyword polling timeout")
+                return;
+            }
+            setTimeout(searchKeyword, pollingTimeout);
             return;
-        } catch (e) {
-            console.log("EXCEPTION:akr_UI:" + e);
         }
+        var indexOfKeywords = parseInt(LS_getValue("indexOfKeywords"));
+        var keyword = strip(LS_getValue("keyword" + indexOfKeywords));
+        console.log("keyword:" + keyword);
+        var textbox = form.getElementsByTagName("input")[0];
+        textbox.value = keyword;
+        var submit = form.getElementsByTagName("input")[1];
+        setTimeout(function() {
+            debug("goto search result (all)");
+            LS_putValue("expecting", "search_result_all");
+            submit.click();
+        }, clickTimeout);
     }
 
-    // Main Transitions
-    console.log("entering " + document.URL)
-
-    if (document.URL.indexOf(urlstart) == 0) {
-        if (isExpectingPage(urlrestart)) {
-            LS_putValue("nextFire", Date.now() + interval);
-        }
-        LS_deleteValue("expecting");
-        akr_UI();
-        return;
-    }
-
-    if (document.URL.indexOf(urllist) == 0 && isExpectingPage(urllist)) {
-        parseReservationList();
-        return;
-    }
-
-    if (document.URL.indexOf(urlsearch) == 0 && isExpectingPage(urlsearch)) {
+    if (document.URL.indexOf(url_search_all) === 0 && isExpectingPage("search_result_all")) {
         setTimeout(function() {
             var div = document.getElementById("js-tab-menu-area");
             if (!div) {
-                nextKeyword(true);
+                nextKeyword();
                 return;
             }
             var ul = div.getElementsByTagName("ul")[1];
             var li = ul.getElementsByTagName("li")[1];
             var a = li.getElementsByTagName("a")[0];
-            location.href = a.getAttribute("data-href");
-            setTimeout(parseSearchResult, displayTimeout);
+            setTimeout(function() {
+                debug("goto search result (tv)");
+                LS_putValue("expecting", "search_result_tv");
+                location.href = a.getAttribute("data-href");
+            }, clickTimeout);
         }, displayTimeout);
         return;
     }
 
-    if (document.URL.indexOf(urldetail) == 0 && isExpectingPage(urlsearch)) {
-        nextKeyword(true);
+    if (document.URL.indexOf(url_search_tv) === 0 && isExpectingPage("search_result_tv")) {
+        setTimeout(parseSearchResult, displayTimeout, nextTitle, nextKeyword);
+        return;
+    }
+
+    function nextTitle() {
+        debug("nextTitle");
+        if (nextTitle0()) {
+            searchTitle();
+            return;
+        }
+        nextKeyword();
+    }
+
+    function nextTitle0() {
+        var indexOfTitles = parseInt(LS_getValue("indexOfTitles"));
+        if (!(indexOfTitles >= 0)) {
+            console.log("ERROR: indexOfTitles == " + indexOfTitles)
+            return false;
+        }
+        if (indexOfTitles === 0) {
+            return false;
+        }
+        indexOfTitles--;
+        LS_putValue("indexOfTitles", indexOfTitles);
+        return true;
+    }
+
+    function searchTitle() {
+        var indexOfTitles = parseInt(LS_getValue("indexOfTitles"));
+        var title = strip(LS_getValue("title" + indexOfTitles));
+        var crid = strip(LS_getValue("crid" + indexOfTitles));
+        trace("searchTitle", indexOfTitles, title, crid)
+        if (!checkTitlePre2(title)) {
+            setTimeout(nextTitle, 0);
+            return;
+        }
+        setTimeout(function() {
+            debug("goto title detail");
+            LS_putValue("expecting", "title_detail");
+            location.href = "/tv/detail/" + crid;
+        }, clickTimeout);
+    }
+
+    if (document.URL.indexOf(url_detail) === 0 && isExpectingPage("title_detail", "reserve_recording")) {
+        setTimeout(handleTitleDetail, displayTimeout, nextTitle, nextTitle);
         return
     }
 
-    if (document.URL.indexOf(urllogin) == 0 && isExpectingPage(urllogin)) {
-        console.log("urllogin");
+    if (document.URL.indexOf(url_recording_confirm) === 0 && isExpectingPage("reserve_recording")) {
+        setTimeout(handleConfirmReservation, displayTimeout, nextTitle, nextTitle);
+        return
+    }
+
+    if (document.URL.indexOf(url_recording_complete) === 0 && isExpectingPage("confirm_recording")) {
+        setTimeout(handleCompleteReservation, displayTimeout, nextTitle, nextTitle);
+        return
+    }
+
+    // ---------------------------- Auto-login transitions ----------------------------
+
+    if (document.URL.indexOf(url_login) === 0 && LS_getValue("expecting")) {
         setTimeout(function() {
             var aikotoba = document.getElementById("aikotoba");
             if (!aikotoba) {
@@ -1022,42 +1084,25 @@ THE SOFTWARE.
             var form = document.getElementById("login_form1");
             var submit = form.getElementsByTagName("input")[2];
             setTimeout(function() {
-                gotoPage(urllogincomp);
                 submit.click();
             }, clickTimeout);
         }, displayTimeout);
         return;
     }
 
-    if (document.URL.indexOf(urllogincomp) == 0 && isExpectingPage(urllogincomp)) {
-        gotoPage(urllogincomp);
+    if (document.URL.indexOf(url_login_complete) === 0 && LS_getValue("expecting")) {
+        var expecting = LS_getValue("expecting");
+        if (expecting !== "reserve_recording") {
+            console.log("WARN: unexpected login request in " + expecting);
+            searchLoopEntry();
+        }
         return;
     }
 
-    if (isExpectingPage(urllogincomp)) {
-        nextKeyword(true);
-        return;
-    }
 
-    if (document.URL == urllist + "?disp=now" && isExpectingPage(urldelcomp)) {
-        console.log("deleting expired reservation...");
-        handleDeleteReservation();
-        return;
-    }
-    if (document.URL.indexOf(urldelcomp) == 0 && isExpectingPage(urldelcomp)) {
-        handleDeleteReservation();
-        return;
-    }
+    // ---------------------------- Cancel-all transitions ----------------------------
 
-    if (document.URL.indexOf(urllist) == 0 && isExpectingPage(urlcancomp)) {
-        handleCancelReservation();
-        return;
-    }
-    if (document.URL.indexOf(urldelcomp) == 0 && isExpectingPage(urlcancomp)) {
-        handleCancelReservation();
-        return;
-    }
-    if (document.URL == urllist + "?disp=before") {
+    if (document.URL === url_reservation_list) {
         var contents_member = document.getElementById("contents_member");
         var div = document.createElement("div");
         div.innerHTML = '<button style="float:right;">すべてキャンセル</button>';
@@ -1072,6 +1117,50 @@ THE SOFTWARE.
         return;
     }
 
-    console.log("no handlers found ...");
+    function handleCancelReservation() {
+        var tables = document.getElementsByTagName("table");
+        for (table of tables) {
+            var asl = table.getElementsByTagName("a");
+            for (var i = 0; i < asl.length; i++) {
+                if (asl[i].textContent != "×") {
+                    continue;
+                }
+                var onclick = asl[i].getAttribute("onClick");
+                setTimeout(function() {
+                    LS_putValue("expecting", "cancel");
+                    debug("goto cancel a title");
+                    var delReservedData = unsafeWindow.delReservedData;
+                    unsafeWindow.confirm = unsafeWindow.String;
+                    eval('{' + onclick + '}');
+                }, clickTimeout);
+                return;
+            }
+        }
+        try {
+            var p = document.getElementsByClassName("next")[0];
+            var href = p.getElementsByTagName("a")[0].href;
+            setTimeout(function() {
+                debug("goto next page for cancel");
+                LS_putValue("expecting", "cancel");
+                location.href = href;
+            }, clickTimeout);
+            return;
+        } catch (e) {}
+        console.log("no items to cancel");
+        location.href = url_reservation_list;
+        return true;
+    }
+
+    if (document.URL.indexOf(url_reservation_list) === 0 && isExpectingPage("cancel")) {
+        handleCancelReservation();
+        return;
+    }
+
+    if (document.URL.indexOf(url_delete_complete) === 0 && isExpectingPage("cancel")) {
+        handleCancelReservation();
+        return;
+    }
+
+    console.log("WARN: no handlers found ...");
 
 })();
