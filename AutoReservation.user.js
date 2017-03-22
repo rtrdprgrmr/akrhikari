@@ -36,7 +36,7 @@ THE SOFTWARE.
 // @grant	GM_getValue
 // @grant	GM_setValue
 // @grant	GM_deleteValue
-// @version     2.21
+// @version     2.22
 // ==/UserScript==
 //
 
@@ -662,6 +662,9 @@ var trace_on = false;
 
     function parseReservationList(resolve, reject) {
         var table = document.getElementsByTagName("table")[0];
+        if (!table) {
+            resolve();
+        }
         var list = table.getElementsByTagName("tr");
         for (var i = 1; i < list.length; i++) {
             var tds = list[i].getElementsByTagName("td");
