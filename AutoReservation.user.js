@@ -36,7 +36,7 @@ THE SOFTWARE.
 // @grant	GM_getValue
 // @grant	GM_setValue
 // @grant	GM_deleteValue
-// @version     2.22
+// @version     2.30
 // ==/UserScript==
 //
 
@@ -178,8 +178,19 @@ var trace_on = false;
 
     function UI() {
         var tableTemplate = '' +
-            '<div>' + '<h1 style="text-align:center;color:#00a2e6;margin-bottom:20px;margin-top:60px;">' +
-            '<span>キーワード自動予約</span></h1>' +
+            '<div style="margin-bottom:20px;margin-top:60px;position:relative">' +
+            '<div><h1 style="text-align:center;color:#00a2e6">キーワード自動予約</h1></div>' +
+            '<nav style="position:absolute;bottom:0;right:0">' +
+            '<ul class="menu" style="width:31px"><li class="menu__mega">' +
+            '<div style="padding:5px;color:#fff;text-align:center">&#9881;</div>' +
+            '<ul class="menu__second-level" style="width:270px">' +
+            '<li><p><a href="#" id="save_resv_conf">予約設定の書き出し</a></li>' +
+            '<li><p><a href="#" id="restore_resv_conf">予約設定の復元</a></li>' +
+            '<input type="file" id="file_resv_conf" style="display:none">' +
+            '</ul>' +
+            '</li></ul>' +
+            '</nav>' +
+            '</div>' +
             '<div class="table__scroll--fixed"><table class="table__description th_head01"><tr>' +
             '<th width="30%">キーワード</th>' +
             '<th width="15%">番組ジャンル</th>' +
@@ -187,14 +198,16 @@ var trace_on = false;
             '<th width="30%">除外ワード</th>' +
             '<th width="5%"></th>' +
             '<th width="5%"></th>' +
-            '</tr></table></div><div id="akr_option" style="padding:6px;">' +
+            '</tr></table></div>' +
+            '<div id="akr_option" style="padding:6px;">' +
             '予約範囲：<select id="akr_days"><option>1</option><option>2</option><option>3</option>' +
             '<option>4</option><option>5</option><option>6</option><option>7</option></select>日後まで　　' +
             '<input type="checkbox" id="akr_rep" style="margin:20px 5px 20px 5px">' +
             '<label id="akr_rep_text" for="akr_rep">予約を自動リピートする</label>' +
             '<p class="text-center btn_chg">' +
             '<input class="btn__default link--on-mouse" id="akr_start" value="自動予約">' +
-            '</p></div></div>';
+            '</p>' +
+            '</div>';
         var keywordTemplate1 = '' +
             '<td style="padding:17px"><input type="text" class="l-border-light-blue" style="width:100%"></td>' +
             '<td style="padding:17px"><input type="text" class="l-border-light-blue" style="width:100%"></td>' +
@@ -402,18 +415,79 @@ var trace_on = false;
         akr_days.addEventListener('change', function() {
             LS_putValue("akr_days", akr_days.selectedIndex);
         }, false);
+
         var akr_start = document.getElementById("akr_start");
         akr_start.addEventListener('click', startAction, false);
         var akr_rep_text = document.getElementById("akr_rep_text");
         if (options[0].checked) {
             var nextFire = LS_getValue("nextFire");
-            if (nextFire === "") {
-                return;
+            if (nextFire !== "") {
+                countDownTime = parseInt(nextFire);
+                countDownRemain = countDownThreshold;
+                countDown();
             }
-            countDownTime = parseInt(nextFire);
-            countDownRemain = countDownThreshold;
-            countDown();
         }
+
+        var save_resv_conf = document.getElementById("save_resv_conf");
+        var saveConfAction = function() {
+            var list = [];
+            for (var i = 0;; i++) {
+                var keyword = LS_getValue("keyword" + i);
+                if (keyword === "") {
+                    break;
+                }
+                var genre = LS_getValue("genre" + i);
+                var channel = LS_getValue("channel" + i);
+                var except = LS_getValue("except" + i);
+                list.push({
+                    keyword,
+                    genre,
+                    channel,
+                    except
+                });
+            }
+            var content = JSON.stringify(list, null, 4);
+            var blob = new Blob([content], {
+                "type": "application/json"
+            });
+            var d = new Date();
+            save_resv_conf.download = "akrkwd-" + d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate() + ".json";
+            save_resv_conf.href = window.URL.createObjectURL(blob);
+        };
+        save_resv_conf.addEventListener('click', saveConfAction, false);
+
+        var restore_resv_conf = document.getElementById("restore_resv_conf");
+        var restoreConfAction = function(e) {
+            e.preventDefault();
+            var file_resv_conf = document.getElementById("file_resv_conf");
+            file_resv_conf.addEventListener('change', onchange, false);
+            file_resv_conf.click();
+
+            function onchange() {
+                var file = this.files[0];
+                var fr = new FileReader();
+                fr.readAsText(file);
+                fr.onload = function() {
+                    var text = fr.result;
+                    try {
+                        var list = JSON.parse(text);
+                    } catch (e) {
+                        console.log("ERROR: " + file.name, e)
+                        return;
+                    }
+                    for (var j = 0; j < list.length; j++) {
+                        LS_putValue("keyword" + j, list[j].keyword);
+                        LS_putValue("genre" + j, list[j].genre);
+                        LS_putValue("channel" + j, list[j].channel);
+                        LS_putValue("except" + j, list[j].except);
+                    }
+                    LS_putValue("keyword" + j, "");
+                    location.reload();
+                };
+            }
+            return false;
+        };
+        restore_resv_conf.addEventListener('click', restoreConfAction, false);
         return;
     }
 
@@ -1082,7 +1156,7 @@ var trace_on = false;
         return
     }
 
-    if (document.URL.indexOf(url_recording_complete) === 0 && isExpectingPage("confirm_recording")) {
+    if (document.URL.indexOf(url_recording_complete) === 0 && isExpectingPage("title_detail", "confirm_recording")) {
         setTimeout(handleCompleteReservation, displayTimeout, nextTitle, nextTitle);
         return
     }
