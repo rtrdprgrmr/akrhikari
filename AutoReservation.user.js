@@ -36,7 +36,7 @@ THE SOFTWARE.
 // @grant	GM_getValue
 // @grant	GM_setValue
 // @grant	GM_deleteValue
-// @version     2.30
+// @version     2.31
 // ==/UserScript==
 //
 
@@ -331,19 +331,28 @@ var trace_on = false;
         }
         var clickAction = function(e) {
             LS_putValue("automatic", options[0].checked);
-            if (!options[0].checked) {
+            if (options[0].checked) {
+                if (!LS_getValue("nextFire")) {
+                    LS_putValue("nextFire", Date.now() + auto_reserve_interval);
+                }
+                countDownRemain = countDownThreshold;
+                countDown();
+            } else {
                 LS_deleteValue("nextFire");
-                countDownTime = 0;
                 akr_rep_text.textContent = "予約を自動リピートする";
             }
             return true;
         }
-        var countDownTime = 0;
         var countDownRemain;
         var countDown = function() {
-            if (countDownTime === 0) {
+            if (!options[0].checked) {
                 return;
             }
+            var nextFire = LS_getValue("nextFire");
+            if (!nextFire) {
+                return;
+            }
+            var countDownTime = parseInt(nextFire);
             var now = Date.now();
             var sec = Math.floor((countDownTime - now) / 1000);
             if (sec < countDownRemain) {
@@ -419,14 +428,7 @@ var trace_on = false;
         var akr_start = document.getElementById("akr_start");
         akr_start.addEventListener('click', startAction, false);
         var akr_rep_text = document.getElementById("akr_rep_text");
-        if (options[0].checked) {
-            var nextFire = LS_getValue("nextFire");
-            if (nextFire !== "") {
-                countDownTime = parseInt(nextFire);
-                countDownRemain = countDownThreshold;
-                countDown();
-            }
-        }
+        clickAction();
 
         var save_resv_conf = document.getElementById("save_resv_conf");
         var saveConfAction = function() {
@@ -964,9 +966,6 @@ var trace_on = false;
     console.log("entering " + document.URL + " expecting " + LS_getValue("expecting"));
 
     if (document.URL.indexOf(url_entry) === 0) {
-        if (isExpectingPage("done")) {
-            LS_putValue("nextFire", Date.now() + auto_reserve_interval);
-        }
         LS_deleteValue("expecting");
         UI();
         return;
@@ -1078,12 +1077,12 @@ var trace_on = false;
         var submit = form.getElementsByTagName("input")[1];
         setTimeout(function() {
             debug("goto search result (all)");
-            LS_putValue("expecting", "search_result_all");
+            LS_putValue("expecting", "search_result");
             submit.click();
         }, clickTimeout);
     }
 
-    if (document.URL.indexOf(url_search_all) === 0 && isExpectingPage("search_result_all")) {
+    if (document.URL.indexOf(url_search_all) === 0 && isExpectingPage("search_result")) {
         setTimeout(function() {
             var div = document.getElementById("js-tab-menu-area");
             if (!div) {
@@ -1095,14 +1094,14 @@ var trace_on = false;
             var a = li.getElementsByTagName("a")[0];
             setTimeout(function() {
                 debug("goto search result (tv)");
-                LS_putValue("expecting", "search_result_tv");
+                LS_putValue("expecting", "search_result");
                 location.href = a.getAttribute("data-href");
             }, clickTimeout);
         }, displayTimeout);
         return;
     }
 
-    if (document.URL.indexOf(url_search_tv) === 0 && isExpectingPage("search_result_tv")) {
+    if (document.URL.indexOf(url_search_tv) === 0 && isExpectingPage("search_result")) {
         setTimeout(parseSearchResult, displayTimeout, nextTitle, nextKeyword);
         return;
     }
