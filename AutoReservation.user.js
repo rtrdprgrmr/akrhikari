@@ -735,7 +735,8 @@ function handleExpiredReservation(resolve, reject) {
 }
 
 function parseReservationList(resolve) {
-	var table = document.getElementsByTagName("table")[0];
+	var main = document.getElementById("contents_member");
+	var table = main.getElementsByTagName("table")[0];
 	if (!table) {
 		resolve();
 	}
