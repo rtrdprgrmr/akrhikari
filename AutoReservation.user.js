@@ -26,7 +26,7 @@ THE SOFTWARE.
 // @description	This script automatically make reservations of TV programs which match the keyword you specified.
 // @namespace   rtrdprgrmr@yahoo.co.jp
 // @copyright	2014-2017, rtrdprgrmr
-// @license	MIT License
+// @license	MIT
 // @downloadURL	https://rtrdprgrmr.github.io/akrhikari/AutoReservation.user.js
 // @updateURL	https://rtrdprgrmr.github.io/akrhikari/AutoReservation.meta.js
 // @homepageURL	https://github.com/rtrdprgrmr/akrhikari
