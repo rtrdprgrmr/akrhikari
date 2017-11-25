@@ -29,7 +29,7 @@ THE SOFTWARE.
 // @license	MIT
 // @downloadURL	https://rtrdprgrmr.github.io/akrhikari/AutoReservation.user.js
 // @updateURL	https://rtrdprgrmr.github.io/akrhikari/AutoReservation.meta.js
-// @homepageURL	https://github.com/rtrdprgrmr/akrhikari
+// @homepageURL	https://akrhikari.blogspot.jp/2014/08/blog-post.html
 // @supportURL	https://github.com/rtrdprgrmr/akrhikari/issues
 // @include     https://www.hikaritv.net/*
 // @include     https://accounts.hikaritv.net/member/*
@@ -713,7 +713,7 @@ var expandCount = 0;
 
 function handleExpiredReservation(resolve, reject) {
 	var tables = document.getElementsByTagName("table");
-	for (table of tables) {
+	for (var table of tables) {
 		var asl = table.getElementsByTagName("a");
 		for (var i = 0; i < asl.length; i++) {
 			if (asl[i].textContent != "×") {
@@ -903,7 +903,7 @@ function handleTitleDetail(resolve, reject) {
 	}
 	var attrs1 = section.getElementsByClassName("mdConts-attibute")[0];
 	var attrs = attrs1.children[0].children;
-	for (attr of attrs) {
+	for (var attr of attrs) {
 		if (attr.textContent === "プレミアムチャンネル") {
 			var isPremium = true;
 		}
