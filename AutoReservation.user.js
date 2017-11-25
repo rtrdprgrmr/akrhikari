@@ -1211,7 +1211,7 @@ if (document.URL === url_reservation_list) {
 
 function handleCancelReservation() {
 	var tables = document.getElementsByTagName("table");
-	for (table of tables) {
+	for (var table of tables) {
 		var asl = table.getElementsByTagName("a");
 		for (var i = 0; i < asl.length; i++) {
 			if (asl[i].textContent != "×") {
