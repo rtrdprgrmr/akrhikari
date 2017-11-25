@@ -1028,7 +1028,6 @@ if (document.URL.indexOf(url_reservation_list) === 0 && isExpectingPage("reserva
 
 if (document.URL.indexOf(url_reservation_list) === 0) {
 	setTimeout(parseReservationList, pollingTimeout, function() {});
-	return;
 }
 
 function nextKeyword() {
