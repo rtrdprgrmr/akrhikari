@@ -1,6 +1,6 @@
 ﻿
 /*
-Copyright(C) 2014-2017 rtrdprgrmr
+Copyright(C) 2014-2018 rtrdprgrmr
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -25,7 +25,7 @@ THE SOFTWARE.
 // @name        Automated Keyword Reservation for www.hikaritv.net
 // @description	This script automatically make reservations of TV programs which match the keyword you specified.
 // @namespace   rtrdprgrmr@yahoo.co.jp
-// @copyright	2014-2017, rtrdprgrmr
+// @copyright	2014-2018, rtrdprgrmr
 // @license	MIT
 // @downloadURL	https://rtrdprgrmr.github.io/akrhikari/AutoReservation.user.js
 // @updateURL	https://rtrdprgrmr.github.io/akrhikari/AutoReservation.meta.js
@@ -36,7 +36,7 @@ THE SOFTWARE.
 // @grant	GM_getValue
 // @grant	GM_setValue
 // @grant	GM_deleteValue
-// @version     2.32
+// @version     2.33
 // ==/UserScript==
 //
 
@@ -1154,7 +1154,7 @@ if (document.URL.indexOf(url_recording_confirm) === 0 && isExpectingPage("reserv
 	return
 }
 
-if (document.URL.indexOf(url_recording_complete) === 0 && isExpectingPage("title_detail", "confirm_recording")) {
+if (document.URL.indexOf(url_recording_complete) === 0 && isExpectingPage("title_detail", "reserve_recording", "confirm_recording")) {
 	setTimeout(handleCompleteReservation, displayTimeout, nextTitle, nextTitle);
 	return
 }
