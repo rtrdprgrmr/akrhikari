@@ -36,7 +36,7 @@ THE SOFTWARE.
 // @grant	GM_getValue
 // @grant	GM_setValue
 // @grant	GM_deleteValue
-// @version     2.33
+// @version     2.34
 // ==/UserScript==
 //
 
@@ -780,7 +780,7 @@ function parseReservationList(resolve) {
 
 function parseSearchResult(resolve, reject) {
 	var div_tab_tv = document.getElementById("tab-tv");
-	var ul = div_tab_tv.getElementsByClassName("search-list")[0];
+	var ul = div_tab_tv && div_tab_tv.getElementsByClassName("search-list")[0];
 	if (!ul) {
 		if (document.getElementsByClassName("seach-error")[0]) {
 			reject();
