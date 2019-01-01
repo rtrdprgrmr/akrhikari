@@ -36,7 +36,7 @@ THE SOFTWARE.
 // @grant	GM_getValue
 // @grant	GM_setValue
 // @grant	GM_deleteValue
-// @version     2.34
+// @version     2.35
 // ==/UserScript==
 //
 
@@ -810,7 +810,7 @@ function parseSearchResult(resolve, reject) {
 	var keyword = strip(LS_getValue("keyword" + indexOfKeywords));
 	var list = ul.getElementsByTagName("li");
 	var indexOfTitles = 0;
-	for (var i = 0; i < list.length; i++) {
+	for (var i = list.length - 1; i >= 0; i--) {
 		var title = stripconv(list[i].textContent);
 		var crid = list[i].getAttribute("data-href").split('&')[1];
 		if (!crid || !title) continue;
