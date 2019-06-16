@@ -1161,25 +1161,33 @@ if (document.URL.indexOf(url_recording_complete) === 0 && isExpectingPage("title
 // ---------------------------- Auto-login transitions ----------------------------
 
 if (document.URL.indexOf(url_login) === 0 && LS_getValue("expecting")) {
-    var retry = 0;
-    var func = function() {
+    setTimeout(function() {
         var aikotoba = document.getElementById("aikotoba");
         if (!aikotoba) {
             console.log("no password input box");
             return;
         }
         if (!aikotoba.value) {
-            console.log("no password... retrying " + retry);
-            if (retry++ < 5) setTimeout(func, displayTimeout);
-            return;
+            console.log("no password");
+            var password = LS_getValue("login_password");
+            aikotoba.value = password;
+            console.log("set password as " + password);
         }
         var form = document.getElementById("login_form1");
         var submit = form.getElementsByTagName("input")[2];
+        submit.addEventListener('click', function() {
+            if (aikotoba.value) {
+                var password = aikotoba.value;
+                LS_putValue("login_password", password);
+                console.log("save password as " + password);
+            }
+            //save user.value
+            //LS_putValue("login_user", -1);
+        });
         setTimeout(function() {
             submit.click();
         }, clickTimeout);
-    };
-    setTimeout(func, displayTimeout);
+    }, displayTimeout);
     return;
 }
 
