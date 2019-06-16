@@ -1162,27 +1162,33 @@ if (document.URL.indexOf(url_recording_complete) === 0 && isExpectingPage("title
 
 if (document.URL.indexOf(url_login) === 0 && LS_getValue("expecting")) {
     setTimeout(function() {
+        var webid = document.getElementById("webid");
         var aikotoba = document.getElementById("aikotoba");
+        if (!webid) {
+            console.log("no username input box");
+            return;
+        }
         if (!aikotoba) {
             console.log("no password input box");
             return;
         }
-        if (!aikotoba.value) {
-            console.log("no password");
+        if (!aikotoba.value || !webid.value) {
+            var username = LS_getValue("login_username");
             var password = LS_getValue("login_password");
+            webid.value = username;
             aikotoba.value = password;
-            console.log("set password as " + password);
+            console.log("set username/password as " + username + "/" + password);
         }
         var form = document.getElementById("login_form1");
         var submit = form.getElementsByTagName("input")[2];
         submit.addEventListener('click', function() {
-            if (aikotoba.value) {
+            if (webid.value && aikotoba.value) {
+                var username = webid.value;
                 var password = aikotoba.value;
+                LS_putValue("login_username", username);
                 LS_putValue("login_password", password);
-                console.log("save password as " + password);
+                console.log("save username/password as " + username + "/" + password);
             }
-            //save user.value
-            //LS_putValue("login_user", -1);
         });
         setTimeout(function() {
             submit.click();
