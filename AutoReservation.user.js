@@ -48,7 +48,7 @@ var oneday = 24 * onehour;
 // ---------------------------- Parameters ----------------------------
 
 var history = 60 * oneday;
-var auto_reserve_interval = 24 * onehour;
+var auto_reserve_interval = 1 * onehour;
 var displayTimeout = 3000;
 var clickTimeout = 3000;
 var pollingTimeout = 3000;
