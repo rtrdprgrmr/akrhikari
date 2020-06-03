@@ -1,5 +1,5 @@
 /*
-Copyright(C) 2014-2018 rtrdprgrmr
+Copyright(C) 2014-2020 rtrdprgrmr
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -35,24 +35,12 @@ THE SOFTWARE.
 // @grant	GM_getValue
 // @grant	GM_setValue
 // @grant	GM_deleteValue
-// @version     2.36
+// @version     2.37
 // ==/UserScript==
 //
 
-var debug_on = false;
-var trace_on = false;
-
-function debug() {
-    if (!debug_on) return;
-    var args = Array.prototype.slice.call(arguments);
-    console.log.apply(console, ["debug:"].concat(args));
-}
-
-function trace() {
-    if (!trace_on) return;
-    var args = Array.prototype.slice.call(arguments);
-    console.log.apply(console, ["trace:"].concat(args));
-}
+var debug= () => {};
+var trace= () => {};
 
 var onehour = 60 * 60 * 1000;
 var oneday = 24 * onehour;
@@ -60,10 +48,10 @@ var oneday = 24 * onehour;
 // ---------------------------- Parameters ----------------------------
 
 var history = 60 * oneday;
-var auto_reserve_interval = 1 * onehour;
-var displayTimeout = 2000;
-var clickTimeout = 1000;
-var pollingTimeout = 300;
+var auto_reserve_interval = 24 * onehour;
+var displayTimeout = 3000;
+var clickTimeout = 3000;
+var pollingTimeout = 3000;
 var countDownThreshold = 60; // sec
 
 var url_entry = "https://www.hikaritv.net/member/remote/reserve/regist";
@@ -249,7 +237,7 @@ function UI() {
         var list = table.getElementsByTagName("tr");
         for (var i = 0; i < list.length; i++) {
             if (list[i] === tr) {
-                console.log("start clicked " + i);
+                debug("start clicked " + i);
                 e.target.disabled = true;
                 LS_putValue("indexOfTheKeyword", i - 1);
                 startAutoReserve();
@@ -367,7 +355,7 @@ function UI() {
         setTimeout(countDown, 1000);
     }
     var startAction = function() {
-        console.log("start clicked");
+        debug("start clicked");
         akr_start.disabled = true;
         LS_putValue("indexOfTheKeyword", -1);
         startAutoReserve();
@@ -560,7 +548,7 @@ function decode(coded) {
 }
 
 function parseTimeRange(content) {
-    args = content.match(/[0-9]+/g);
+    var args = content.match(/[0-9]+/g);
     args[0]--; // change the base of month number to zero
     var year = new Date().getFullYear();
     var month = new Date().getMonth();
@@ -579,7 +567,7 @@ function parseTimeRange(content) {
 }
 
 function parseTimeRange2(content) {
-    args = content.match(/[0-9]+/g);
+    var args = content.match(/[0-9]+/g);
     args[1]--; // change the base of month number to zero
     var start = new Date(args[0], args[1], args[2], args[3], args[4]).valueOf();
     var end = new Date(args[0], args[1], args[2], args[5], args[6]).valueOf();
@@ -591,25 +579,27 @@ function parseTimeRange2(content) {
 
 
 function parseChannel(content) {
-    args = content.match(/([0-9]{3,3})/);
+    var args = content.match(/([0-9]{3,3})/);
     var channo = args[args.length - 1];
     return channo;
 }
 
 function checkTitlePre1(title, channo) {
+    var channel_source;
     var indexOfKeywords = parseInt(LS_getValue("indexOfKeywords"));
     var channelREX = new RegExp(channel_source = stripconv(LS_getValue("channel" + indexOfKeywords)), "i");
     var exceptREX = new RegExp(stripconv(LS_getValue("except" + indexOfKeywords)), "i");
     var code = encode(title);
+
+    if (channel_source && channel_source.search(/[^0-9+*?{,}\[\]-]/) < 0) {
+        if (!channelREX.test(channo)) {
+            console.log("not channo:" + title + "(" + channo +")")
+            return false;
+        }
+    }
     if (exceptREX.test(title) && exceptREX.exec(title)[0].length > 0) {
         console.log("except:" + title)
         return false;
-    }
-    if (channo && channel_source.search(/[^0-9+*?{,}\[\]-]/) < 0) {
-        if (!channelREX.test(channo)) {
-            console.log("not channo:" + title)
-            return false;
-        }
     }
     return true;
 }
@@ -628,6 +618,7 @@ function checkTitlePre2(title) {
 }
 
 function checkTitle(title, range, genre, channel, isPremium) {
+    debug('checkTitle', title, range[0], range[1], genre, 'channel='+channel, 'premium='+isPremium);
     var indexOfKeywords = parseInt(LS_getValue("indexOfKeywords"));
     var genreREX = new RegExp(stripconv(LS_getValue("genre" + indexOfKeywords)), "i");
     var channelREX = new RegExp(channel_source = stripconv(LS_getValue("channel" + indexOfKeywords)), "i");
@@ -687,6 +678,7 @@ function checkDate(start) {
 
 function isExpectingPage() {
     var expecting = LS_getValue("expecting");
+    var orig_url = document.URL;
     for (var i = 0; i < arguments.length; i++) {
         var page = arguments[i];
         if (expecting === page) {
@@ -694,7 +686,7 @@ function isExpectingPage() {
             setTimeout(function() {
                 if (page === "done") return
                 console.log("RELOADING... " + document.URL);
-                LS_putValue("expecting", page);
+                if(document.URL==orig_url || !LS_getValue("expecting")) LS_putValue("expecting", page);
                 var script = document.createElement('script');
                 script.appendChild(document.createTextNode('location.reload();'));
                 document.body.appendChild(script);
@@ -961,11 +953,17 @@ function handleCompleteReservation(resolve, reject) {
 
 // ---------------------------- Main transitions ----------------------------
 
+
 console.log("entering " + document.URL + " expecting " + LS_getValue("expecting"));
 
 if (document.URL.indexOf(url_entry) === 0) {
     LS_deleteValue("expecting");
     UI();
+    return;
+}
+
+if(!LS_getValue("expecting")){
+    console.log("unexpected page visit");
     return;
 }
 
